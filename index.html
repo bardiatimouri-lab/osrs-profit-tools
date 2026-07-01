@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F2P Profit Tools — OSRS Alch & Flip (Live)</title>
+<style>
+  :root{
+    --bg:#1b1712; --bg2:#241f18; --panel:#2c261d; --panel2:#352e23;
+    --line:#5a4a2a; --line2:#7a6536; --gold:#ffce5c; --gold2:#ffb83f;
+    --txt:#ece3d0; --muted:#b3a888; --dim:#8c8268;
+    --green:#76d275; --green2:#9be39a; --red:#e8736e; --amber:#ffc24d;
+    --shadow:0 2px 0 #00000055, inset 0 0 0 1px #00000033;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 600px at 50% -10%, #2a2419 0%, var(--bg) 60%);
+    color:var(--txt); font-family:"Trebuchet MS",Verdana,Geneva,sans-serif;
+    font-size:14px; line-height:1.45; min-height:100vh; padding:0 0 60px;
+  }
+  a{color:var(--gold)}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 16px}
+
+  /* Header */
+  header.topbar{
+    border-bottom:2px solid var(--line);
+    background:linear-gradient(180deg,#2f2819,#231e15);
+    box-shadow:0 2px 8px #0008;
+  }
+  .topbar .wrap{display:flex;align-items:center;gap:16px;padding:14px 16px;flex-wrap:wrap}
+  .logo{display:flex;flex-direction:column;gap:2px}
+  .logo h1{
+    margin:0;font-size:22px;letter-spacing:.5px;color:var(--gold);
+    text-shadow:1px 1px 0 #000, 0 0 14px #ffb83f33;
+  }
+  .logo .sub{font-size:12px;color:var(--muted)}
+  .badge{
+    display:inline-block;background:#16351a;color:var(--green2);
+    border:1px solid #2f6a35;border-radius:4px;padding:1px 7px;font-size:11px;
+    font-weight:bold;letter-spacing:.5px;vertical-align:middle;margin-left:6px
+  }
+  .grow{flex:1 1 auto}
+  .status{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--dim);box-shadow:0 0 6px #0006}
+  .dot.ok{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .dot.warn{background:var(--amber)}
+  .dot.err{background:var(--red)}
+  button.btn{
+    background:linear-gradient(180deg,#4a3f29,#3a3120);color:var(--gold);
+    border:1px solid var(--line2);border-radius:6px;padding:8px 14px;cursor:pointer;
+    font-family:inherit;font-size:13px;font-weight:bold;box-shadow:var(--shadow);
+    transition:.12s
+  }
+  button.btn:hover{background:linear-gradient(180deg,#5a4d31,#473b26);color:var(--gold2)}
+  button.btn:active{transform:translateY(1px)}
+
+  /* Panels */
+  .panel{
+    background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);
+    margin-top:16px;overflow:hidden
+  }
+  .panel .hd{
+    padding:10px 14px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:#00000022
+  }
+  .panel .hd h2{margin:0;font-size:15px;color:var(--gold);letter-spacing:.3px}
+  .panel .hd .note{font-size:12px;color:var(--muted)}
+  .panel .bd{padding:14px}
+
+  /* Controls */
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+  .ctl label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:bold;letter-spacing:.3px}
+  .ctl input[type=text],.ctl input[type=number],.ctl select{
+    width:100%;background:#1d1913;border:1px solid var(--line);border-radius:6px;
+    color:var(--txt);padding:8px 10px;font-family:inherit;font-size:14px
+  }
+  .ctl input:focus,.ctl select:focus{outline:none;border-color:var(--gold2);box-shadow:0 0 0 2px #ffb83f22}
+  .presets{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+  .chip{
+    background:#1d1913;border:1px solid var(--line);border-radius:5px;color:var(--muted);
+    font-size:11px;padding:3px 9px;cursor:pointer;font-family:inherit
+  }
+  .chip:hover{border-color:var(--gold2);color:var(--gold)}
+  .seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .seg button{
+    flex:1;background:#1d1913;border:0;color:var(--muted);padding:8px 6px;cursor:pointer;
+    font-family:inherit;font-size:12px;font-weight:bold
+  }
+  .seg button.on{background:linear-gradient(180deg,#4a3f29,#3a3120);color:var(--gold)}
+  .toggle{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;padding-top:2px}
+  .toggle input{display:none}
+  .toggle .sw{width:42px;height:23px;border-radius:12px;background:#1d1913;border:1px solid var(--line);position:relative;transition:.15s;flex:0 0 auto}
+  .toggle .sw:after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--dim);transition:.15s}
+  .toggle input:checked + .sw{background:#2f4a2a;border-color:#4e7a44}
+  .toggle input:checked + .sw:after{left:21px;background:var(--green2)}
+  .toggle .lbl{font-size:13px;color:var(--txt)}
+  .row-inline{display:flex;gap:8px;align-items:center}
+  .miniprice{font-size:11px;color:var(--dim);margin-top:4px}
+  .miniprice a{cursor:pointer}
+
+  /* Summary cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-top:16px}
+  .card{
+    background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);
+    border-radius:10px;padding:14px;box-shadow:var(--shadow)
+  }
+  .card .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  .card .v{font-size:24px;font-weight:bold;color:var(--gold);margin-top:5px;line-height:1.1}
+  .card .v.small{font-size:18px}
+  .card .x{font-size:12px;color:var(--dim);margin-top:3px}
+  .card.profit .v{color:var(--green2)}
+
+  /* Basket */
+  .basket-empty{color:var(--muted);text-align:center;padding:18px;font-size:13px}
+  table.basket{width:100%;border-collapse:collapse;font-size:13px}
+  table.basket th,table.basket td{padding:7px 10px;text-align:right;border-bottom:1px solid #00000033}
+  table.basket th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;text-align:right}
+  table.basket th:first-child,table.basket td:first-child{text-align:left}
+  table.basket tfoot td{font-weight:bold;border-top:2px solid var(--line);border-bottom:0;color:var(--gold)}
+  .it{display:flex;align-items:center;gap:9px}
+  .it img{width:26px;height:26px;image-rendering:pixelated;flex:0 0 auto;filter:drop-shadow(0 1px 1px #000)}
+  .it .nm{font-weight:bold;color:var(--txt)}
+
+  /* Main table */
+  .tablewrap{overflow-x:auto}
+  table.items{width:100%;border-collapse:collapse;font-size:13px;min-width:1000px}
+  table.items thead th{
+    position:sticky;top:0;background:#2a241b;color:var(--muted);font-size:11px;
+    text-transform:uppercase;letter-spacing:.4px;padding:9px 10px;text-align:right;
+    border-bottom:2px solid var(--line);cursor:pointer;white-space:nowrap;user-select:none;z-index:2
+  }
+  table.items thead th:first-child{text-align:left}
+  table.items thead th:hover{color:var(--gold)}
+  table.items thead th .ar{color:var(--gold2);font-size:10px}
+  table.items tbody td{padding:7px 10px;text-align:right;border-bottom:1px solid #0000002e;white-space:nowrap}
+  table.items tbody td:first-child{text-align:left}
+  table.items tbody tr:hover{background:#ffce5c0d}
+  td.num{font-variant-numeric:tabular-nums}
+  .pos{color:var(--green2);font-weight:bold}
+  .neg{color:var(--red)}
+  .liq-hi{color:var(--green2)} .liq-mid{color:var(--amber)} .liq-lo{color:var(--red)}
+  .stale{color:var(--amber);font-size:11px}
+  .pill{display:inline-block;background:#1d1913;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;color:var(--muted)}
+  .best{box-shadow:inset 3px 0 0 var(--gold2)}
+
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:11px;color:var(--muted);padding:4px 0 0}
+  .legend b{color:var(--txt)}
+  details.help{margin-top:16px}
+  details.help summary{cursor:pointer;color:var(--gold);font-weight:bold;font-size:14px;padding:6px 0}
+  details.help .bd{color:var(--muted);font-size:13px;line-height:1.6}
+  details.help li{margin:5px 0}
+  .loader{text-align:center;padding:50px;color:var(--muted)}
+  .spin{display:inline-block;width:34px;height:34px;border:4px solid #00000033;border-top-color:var(--gold2);border-radius:50%;animation:sp 1s linear infinite;margin-bottom:12px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .err{background:#3a1d1d;border:1px solid #6a2f2f;color:#ffb3b3;border-radius:8px;padding:14px;margin-top:16px}
+  footer{margin-top:30px;text-align:center;color:var(--dim);font-size:12px;padding:10px}
+  .count{font-size:12px;color:var(--muted)}
+
+  /* Mode tabs */
+  #modeTabs{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
+  #modeTabs .tab{
+    display:flex;flex-direction:column;gap:1px;cursor:pointer;
+    background:linear-gradient(180deg,#2c261d,#211c15);border:1px solid var(--line);
+    border-radius:10px 10px 0 0;padding:9px 20px;color:var(--muted);font-weight:bold;font-size:15px;
+    border-bottom:0;position:relative;top:1px;transition:.12s
+  }
+  #modeTabs .tab:hover{color:var(--gold)}
+  #modeTabs .tab.on{color:var(--gold);background:linear-gradient(180deg,#403621,#2c261d);border-color:var(--line2);box-shadow:0 -2px 10px #0005}
+  #modeTabs .tab small{font-weight:normal;color:var(--dim);font-size:11px}
+  #modeTabs .tab.on small{color:var(--muted)}
+  body.mode-flip .alch-only{display:none!important}
+  body.mode-alch .flip-only{display:none!important}
+
+  /* Confidence badges */
+  .conf{display:inline-block;padding:1px 9px;border-radius:10px;font-size:11px;font-weight:bold;border:1px solid;letter-spacing:.2px}
+  .conf-high{color:var(--green2);border-color:#3f7a40;background:#16351a}
+  .conf-med{color:var(--amber);border-color:#7a6326;background:#352b13}
+  .conf-low{color:#d98b86;border-color:#6a3030;background:#311616}
+  .flow-live{color:var(--green2);border-color:#3f7a40;background:#16351a}
+  .flow-slow{color:var(--amber);border-color:#7a6326;background:#352b13}
+  .flow-hard{color:#ff9a93;border-color:#7a3030;background:#3a1717}
+
+  /* Watchlist */
+  .watch-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
+  .watch-add input{background:#1d1913;border:1px solid var(--line);border-radius:6px;color:var(--txt);padding:8px 10px;font-family:inherit;font-size:13px}
+  .watch-add input:focus{outline:none;border-color:var(--gold2);box-shadow:0 0 0 2px #ffb83f22}
+  #wName{flex:2 1 200px}
+  #wPaid,#wQty{flex:1 1 90px;width:90px}
+  .watch-msg{font-size:12px;color:var(--muted)}
+  .watch-msg.err{color:var(--red)} .watch-msg.ok{color:var(--green2)}
+  .wdel{cursor:pointer;color:var(--dim);font-weight:bold;padding:2px 7px;border-radius:4px;user-select:none}
+  .wdel:hover{color:#ff9a93;background:#3a1717}
+
+  @media(max-width:600px){.logo h1{font-size:18px}.card .v{font-size:20px}#modeTabs .tab{padding:8px 14px;font-size:13px}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="logo">
+      <h1>💰 F2P Profit Tools <span class="badge">FREE-TO-PLAY</span></h1>
+      <div class="sub" id="appSub">Live OSRS Grand Exchange prices · what to buy, and the max price to pay</div>
+    </div>
+    <div class="grow"></div>
+    <div class="status">
+      <span class="dot" id="dot"></span>
+      <span id="statusText">Loading…</span>
+    </div>
+    <button class="btn" id="refreshBtn">🔄 Refresh prices</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- MODE TABS -->
+  <div id="modeTabs">
+    <div class="tab on" data-mode="alch">⚗️ High Alch<small>turn items into coins</small></div>
+    <div class="tab" data-mode="flip">💱 Flip Finder<small>buy low, sell high (AFK)</small></div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="panel" style="margin-top:0;border-top-left-radius:0">
+    <div class="hd"><h2>⚙️ Your settings</h2><span class="note">Everything recalculates instantly. Settings are saved in your browser.</span></div>
+    <div class="bd">
+      <div class="controls">
+
+        <div class="ctl">
+          <label>💰 How much gold do you have?</label>
+          <input type="text" id="gold" placeholder="e.g. 10m  or  2,500,000" autocomplete="off">
+          <div class="presets">
+            <span class="chip" data-gold="1000000">1m</span>
+            <span class="chip" data-gold="5000000">5m</span>
+            <span class="chip" data-gold="10000000">10m</span>
+            <span class="chip" data-gold="50000000">50m</span>
+            <span class="chip" data-gold="100000000">100m</span>
+          </div>
+        </div>
+
+        <div class="ctl alch-only">
+          <label>🏷️ Buying speed (price basis)</label>
+          <div class="seg" id="basisSeg">
+            <button data-basis="insta" class="on">Instant buy</button>
+            <button data-basis="offer">Patient offer</button>
+          </div>
+          <div class="miniprice" id="basisHint">Instant = the price to buy <b>right now</b>. Patient = place a buy offer (cheaper, slower).</div>
+        </div>
+
+        <div class="ctl alch-only">
+          <label>🔥 Runes per cast</label>
+          <label class="toggle">
+            <input type="checkbox" id="staff" checked>
+            <span class="sw"></span>
+            <span class="lbl">Using a Staff of Fire</span>
+          </label>
+          <div class="miniprice">Recommended. The staff gives free fire runes — you only pay for 1 nature rune per alch. A Staff of Fire is a cheap <b>one-time</b> GE buy (~1–2k gp), not a consumable — it pays for itself in a few alchs.</div>
+        </div>
+
+        <div class="ctl alch-only">
+          <label>🌿 Nature rune price (per cast)</label>
+          <input type="number" id="natPrice" min="0">
+          <div class="miniprice" id="natMini"></div>
+        </div>
+
+        <div class="ctl flip-only">
+          <label>🌍 Item universe</label>
+          <div class="seg" id="scopeSeg">
+            <button data-scope="f2p" class="on">F2P</button>
+            <button data-scope="members">Members</button>
+            <button data-scope="all">All</button>
+          </div>
+          <div class="miniprice">F2P = free items. <b>Members</b> = members-only items (fatter margins, absorbs big capital — needs membership). All = both.</div>
+        </div>
+
+        <div class="ctl flip-only">
+          <label>📈 Min margin ROI %</label>
+          <input type="number" id="minRoi" min="0" step="0.5">
+          <div class="miniprice">Hides flips whose margin (after the 2% GE sell tax) is below this. 2% ≈ barely above tax · 4–5%+ = a safer cushion against price moves.</div>
+        </div>
+
+        <div class="ctl flip-only">
+          <label>💷 Max price per item (risk cap)</label>
+          <input type="text" id="maxPrice" placeholder="any — e.g. 1m" autocomplete="off">
+          <div class="presets">
+            <span class="chip" data-maxp="0">Any</span>
+            <span class="chip" data-maxp="100000">100k</span>
+            <span class="chip" data-maxp="1000000">1m</span>
+            <span class="chip" data-maxp="10000000">10m</span>
+          </div>
+          <div class="miniprice">Caps how much gold rides on one item. Lower = safer &amp; fills faster — great while you're learning.</div>
+        </div>
+
+        <div class="ctl alch-only" id="fireWrap" style="display:none">
+          <label>🔥 Fire rune price (×5 per cast)</label>
+          <input type="number" id="firePrice" min="0">
+          <div class="miniprice" id="fireMini"></div>
+        </div>
+
+        <div class="ctl">
+          <label id="minVolLabel">📊 Min 24h volume (liquidity)</label>
+          <input type="number" id="minVol" min="0" step="50">
+          <div class="miniprice" id="minVolHelp">Hides items with fewer than this many combined buys + sells per day. ~100 = comfortably buyable · try 50 for more options · 300+ to be stricter. Higher = safer.</div>
+        </div>
+
+        <div class="ctl">
+          <label>🔎 Search item</label>
+          <input type="text" id="search" placeholder="rune, adamant, helm…" autocomplete="off">
+        </div>
+
+        <div class="ctl">
+          <label>↕️ Sort by</label>
+          <select id="sort">
+            <option value="profit">Profit per alch</option>
+            <option value="youProfit">Total profit (your gold)</option>
+            <option value="roi">Return on gold (ROI %)</option>
+            <option value="vol">24h volume</option>
+            <option value="gphr">Profit per hour</option>
+            <option value="buy">Cheapest buy price</option>
+          </select>
+          <div class="presets" style="margin-top:7px">
+            <label class="toggle" style="gap:7px">
+              <input type="checkbox" id="onlyProfit" checked><span class="sw" style="width:36px;height:20px"></span>
+              <span class="lbl" style="font-size:12px">Profitable only</span>
+            </label>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- WATCHLIST -->
+  <div class="panel">
+    <div class="hd">
+      <h2>📌 My open orders</h2>
+      <span class="note">Track what you bought — break-even, live sell price &amp; profit, surviving every refresh. Saved in your browser.</span>
+    </div>
+    <div class="bd">
+      <div id="watchBody"></div>
+      <div class="watch-add">
+        <input type="text" id="wName" list="itemNames" placeholder="Item you bought (e.g. Emerald ring)" autocomplete="off">
+        <input type="number" id="wPaid" placeholder="Price paid" min="0">
+        <input type="number" id="wQty" placeholder="Qty" min="1">
+        <button class="btn" id="wAdd">+ Add order</button>
+        <span id="wMsg" class="watch-msg"></span>
+      </div>
+    </div>
+  </div>
+  <datalist id="itemNames"></datalist>
+
+  <!-- SUMMARY CARDS -->
+  <div class="cards" id="cards"></div>
+
+  <!-- BASKET -->
+  <div class="panel">
+    <div class="hd">
+      <h2 id="basketTitle">🛒 Your recommended buy plan</h2>
+      <span class="note" id="basketNote">Buys the best items in order of profit, within your gold &amp; the 4-hour GE limits.</span>
+    </div>
+    <div class="bd" id="basket"></div>
+  </div>
+
+  <!-- MAIN TABLE -->
+  <div class="panel">
+    <div class="hd">
+      <h2 id="tableTitle">📜 All F2P alchable items</h2>
+      <span class="grow"></span>
+      <span class="count" id="tableCount"></span>
+    </div>
+    <div class="bd" style="padding:0">
+      <div class="tablewrap">
+        <table class="items" id="itemsTable">
+          <thead><tr id="theadRow"></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="bd">
+        <div class="legend alch-only">
+          <span><b>Pay up to</b> = highest price you should ever pay (break-even). Below it = profit.</span>
+          <span><b style="color:var(--green2)">Vol green</b>=liquid · <b style="color:var(--amber)">amber</b>=thin · <b style="color:var(--red)">red</b>=barely trades</span>
+          <span><span class="stale">⚠</span> = price is stale (hasn't updated recently)</span>
+        </div>
+        <div class="legend flip-only">
+          <span><b>Buy @</b> = place your buy offer here · <b>Sell @</b> = place your sell offer here.</span>
+          <span><b>Net/item</b> = current profit per flip after the 2% GE tax. <span class="stale">⚡</span>=spread wider than usual (may snap back) · <span class="stale">⚠</span>=fluke margin (risky). Plan &amp; Profit/4h use the <b>conservative</b> margin.</span>
+          <span><b>Tradeable now</b> (last 1h): <span class="conf flow-live">🟢 Live</span> both sides flowing · <span class="conf flow-slow">🟡 Slow</span> one side trickling · <span class="conf flow-hard">🔴 Hard</span> can't fill that side right now — bump price or skip. Hover for the live counts.</span>
+          <span><b>Confidence</b>: <span class="conf conf-high">HIGH</span> safe &amp; liquid &amp; live · <span class="conf conf-med">MED</span> ok · <span class="conf conf-low">LOW</span> risky. <span class="stale">⚠</span> = stale price.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HELP -->
+  <details class="help">
+    <summary>❓ How this works &amp; the strategy (read me)</summary>
+    <div class="bd">
+      <ul class="alch-only">
+        <li><b>High Level Alchemy</b> (level 55 Magic, free-to-play) turns an item into gold equal to its <i>high alch value</i>, using 1 nature rune (+5 fire runes, or 0 with a Staff of Fire).</li>
+        <li><b>Profit per alch = High alch value − Buy price − Rune cost.</b> No GE tax applies — alching gives coins directly.</li>
+        <li><b>"Pay up to" (break-even) = High alch − Rune cost.</b> If you buy below this, you profit. Buy above it and you lose money. This is the single number to memorise per item.</li>
+        <li><b>Liquidity is everything.</b> An item showing huge profit but only a handful of daily trades <i>cannot actually be bought</i>. This app ranks real, buyable items — that's why high-volume rune armour usually wins.</li>
+        <li><b>GE buy limits</b> cap how many of one item you can buy every 4 hours. The buy plan respects them, so you spread gold across several items.</li>
+        <li><b>Your gold recycles.</b> Each alch returns ~99% of what you paid <i>plus</i> the profit, so after a batch you have your gold back and can buy again. The 4-hour limits, not your gold, are usually the real cap — repeat the plan each cycle.</li>
+        <li><b>Tip:</b> "Patient offer" pricing buys cheaper (more profit) but fills slower. "Instant buy" is the realistic cost to grab items right now.</li>
+      </ul>
+      <ul class="flip-only">
+        <li><b>Flipping</b> = buy an item at the low (insta-sell) price, then resell at the high (insta-buy) price, pocketing the spread. It's <b>AFK</b> — you place offers and walk away, no clicking like alching.</li>
+        <li><b>Net profit = Sell price − Buy price − 2% GE tax</b> (the tax is taken on the sale). The app already subtracts it, so "Net/item" is your real profit.</li>
+        <li><b>What to buy:</b> stick to <span class="conf conf-high">HIGH</span> confidence rows — fresh prices and healthy volume on <i>both</i> sides, so your buy <i>and</i> sell offers actually fill.</li>
+        <li><b>What to avoid:</b> <span class="conf conf-low">LOW</span> confidence and ⚠ stale rows. A huge margin on an item that barely trades is usually a <i>fake</i> margin — you'll buy it and then be unable to sell, or the price already moved.</li>
+        <li><b>"Tradeable now" — the live check:</b> this reads the <i>last hour</i> of real trades to see if you can actually fill an offer <i>this minute</i>. <span class="conf flow-hard">🔴 Hard buy</span> means almost nobody is selling low right now (exactly what happens to a hyped Emerald amulet — only a few sellers an hour), so your buy offer just sits there. The buy plan <b>automatically skips</b> 🔴 items, so you only get flips you can actually complete.</li>
+        <li><b>It's not guaranteed</b> like alching. Prices drift and offers can sit unfilled. Spreading capital across several solid flips beats betting it all on one fat-looking margin.</li>
+        <li><b>GE buy limits</b> cap each item per 4 hours, so the plan spreads your gold around. Re-buy each cycle. Cycle ~6×/day for the daily figure.</li>
+        <li><b>Item universe (F2P / Members / All):</b> F2P items are cheap, so they can only absorb a few million of capital. <b>Members</b> items are higher-value with fatter margins and soak up big bankrolls — switch to Members if you're a member with lots of gold and the plan says your capital is under-used.</li>
+        <li><b>Smart margin (why you can trust the numbers):</b> every flip is checked against its <i>typical</i> 24-hour margin. If today's spread is much wider than usual (<span class="stale">⚡</span>) it may be a temporary blip that closes before you sell, so the plan quietly uses the <b>smaller, reliable</b> margin. Flukes (<span class="stale">⚠</span> — items that normally have no margin) are kept out of the plan entirely. The result: the plan under-promises and over-delivers instead of chasing mirages.</li>
+        <li><b>Max price per item</b> caps how much gold sits on a single flip — lower = safer and fills faster. Combined with the plan's built-in diversification (no flip &gt; 40% of your bankroll), you're never all-in on one item.</li>
+      </ul>
+      <p style="color:var(--dim)">Prices: <a href="https://prices.runescape.wiki/" target="_blank" rel="noopener">RuneScape Wiki real-time GE API</a> · Icons: RuneLite · Updates ~every 60s. Not affiliated with Jagex.</p>
+    </div>
+  </details>
+
+  <div id="errBox"></div>
+  <div id="loader" class="loader"><div class="spin"></div><div>Fetching live Grand Exchange prices…</div></div>
+
+</div>
+
+<footer>Built for free-to-play alchers · prices are live and may differ slightly from in-game · always sanity-check before bulk buying.</footer>
+
+<script>
+"use strict";
+/* ====================== CONFIG ====================== */
+const API = "https://prices.runescape.wiki/api/v1/osrs";
+const ID_NATURE = 561, ID_FIRE = 554;
+const FIRE_PER_CAST = 5;
+const ALCH_PER_HOUR = 1200;      // realistic high-alch casting speed
+const XP_PER_CAST = 65;          // Magic XP per High Level Alchemy
+const ICON = id => `https://static.runelite.net/cache/item/icon/${id}.png`;
+const LS = "f2pAlch.v1";
+
+/* ====================== STATE ====================== */
+let MAP=null, LATEST=null, VOL=null, H1=null, ROWS=[], FLIP_ROWS=[], lastUpdate=0;
+let HAVE_FLOW=false;   // true when intraday /1h data loaded
+const state = {
+  gold: "", basis:"insta", staff:true, minVol:100, search:"",
+  sort:"profit", onlyProfit:true, natPrice:null, firePrice:null,
+  natAuto:true, fireAuto:true, sortDir:-1,
+  mode:"alch", minRoi:2, flipSort:"per4h", flipSortDir:-1,
+  flipScope:"f2p", maxPrice:0,
+  watch:[]
+};
+let NAME2ITEM = {};   // lowercase item name -> mapping entry
+
+/* ====================== HELPERS ====================== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = n => (n==null||isNaN(n)) ? "–" : Math.round(n).toLocaleString("en-US");
+function fmtShort(n){
+  if(n==null||isNaN(n)) return "–";
+  const a=Math.abs(n);
+  if(a>=1e9) return (n/1e9).toFixed(2).replace(/\.00$/,"")+"b";
+  if(a>=1e6) return (n/1e6).toFixed(2).replace(/\.00$/,"")+"m";
+  if(a>=1e3) return (n/1e3).toFixed(1).replace(/\.0$/,"")+"k";
+  return Math.round(n).toString();
+}
+function parseGold(str){
+  if(!str) return 0;
+  str=String(str).trim().toLowerCase().replace(/,/g,"").replace(/\s+/g,"");
+  if(str==="") return 0;
+  const m=str.match(/^([\d.]+)\s*([kmb])?$/);
+  if(!m) { const n=parseFloat(str); return isNaN(n)?0:Math.max(0,Math.floor(n)); }
+  let n=parseFloat(m[1]); if(isNaN(n)) return 0;
+  const mul={k:1e3,m:1e6,b:1e9}[m[2]]||1;
+  return Math.max(0,Math.floor(n*mul));
+}
+function ageStr(ts){
+  if(!ts) return "";
+  const s=Math.max(0,Math.floor(Date.now()/1000)-ts);
+  if(s<90) return s+"s";
+  if(s<5400) return Math.round(s/60)+"m";
+  if(s<172800) return Math.round(s/3600)+"h";
+  return Math.round(s/86400)+"d";
+}
+const isStale = ts => ts && (Date.now()/1000 - ts) > 3600; // >1h old
+
+/* ====================== DATA ====================== */
+async function getJSON(url){
+  const r = await fetch(url, {headers:{"Accept":"application/json"}});
+  if(!r.ok) throw new Error("HTTP "+r.status+" on "+url);
+  return r.json();
+}
+async function loadMapping(){
+  // mapping changes rarely — cache 24h in localStorage
+  try{
+    const c = JSON.parse(localStorage.getItem("f2pAlch.map")||"null");
+    if(c && c.t && (Date.now()-c.t) < 864e5 && Array.isArray(c.d)) return c.d;
+  }catch(e){}
+  const d = await getJSON(`${API}/mapping`);
+  try{ localStorage.setItem("f2pAlch.map", JSON.stringify({t:Date.now(),d})); }catch(e){}
+  return d;
+}
+async function loadAll(){
+  setStatus("warn","Fetching live prices…");
+  $("loader").style.display="block";
+  try{
+    const [map, latest, vol, h1] = await Promise.all([
+      loadMapping(),
+      getJSON(`${API}/latest`).then(j=>j.data),
+      getJSON(`${API}/24h`).then(j=>j.data).catch(()=>({})), // 24h volume (optional)
+      getJSON(`${API}/1h`).then(j=>j.data).catch(()=>null)    // intraday flow (optional)
+    ]);
+    MAP=map; LATEST=latest; VOL=vol||{}; H1=h1; HAVE_FLOW=!!h1; lastUpdate=Date.now();
+    indexItems();
+    // auto rune prices
+    const nat = priceOf(ID_NATURE,"insta") ?? 130;
+    const fire = priceOf(ID_FIRE,"insta") ?? 5;
+    if(state.natAuto){ state.natPrice=nat; $("natPrice").value=nat; }
+    if(state.fireAuto){ state.firePrice=fire; $("firePrice").value=fire; }
+    $("natMini").innerHTML = `Live: <b style="color:var(--gold)">${fmt(nat)} gp</b> ${state.natAuto?"(auto)":'· <a id="natReset">use live</a>'}`;
+    $("fireMini").innerHTML = `Live: <b style="color:var(--gold)">${fmt(fire)} gp</b> ${state.fireAuto?"(auto)":'· <a id="fireReset">use live</a>'}`;
+    bindResetLinks();
+    build();
+    buildFlips();
+    $("loader").style.display="none";
+    setStatus("ok","Live · updated "+new Date(lastUpdate).toLocaleTimeString());
+    render();
+  }catch(err){
+    $("loader").style.display="none";
+    setStatus("err","Failed to load");
+    $("errBox").innerHTML = `<div class="err"><b>Couldn't reach the price API.</b><br>${esc(err.message)}<br><br>
+      Check your internet connection, then hit <b>Refresh prices</b>. (Some networks/VPNs block the RuneScape Wiki API.)</div>`;
+  }
+}
+function priceOf(id, basis){
+  const L = LATEST && LATEST[id];
+  if(L){
+    if(basis==="insta" && L.high) return L.high;
+    if(basis==="offer" && L.low)  return L.low;
+    if(L.high) return L.high; if(L.low) return L.low;
+  }
+  const V = VOL && VOL[id];
+  if(V){ return basis==="offer" ? (V.avgLowPrice||V.avgHighPrice) : (V.avgHighPrice||V.avgLowPrice); }
+  return null;
+}
+
+/* ====================== BUILD ROWS ====================== */
+function runeCost(){
+  const nat = num(state.natPrice, 130);
+  const fire = state.staff ? 0 : num(state.firePrice,5)*FIRE_PER_CAST;
+  return nat + fire;
+}
+const num = (v,d)=>{ const n=Number(v); return isFinite(n)&&n>=0 ? n : d; };
+
+function build(){
+  ROWS=[];
+  const rc = runeCost();
+  for(const m of MAP){
+    if(m.members) continue;                 // FREE-TO-PLAY only
+    if(!m.highalch || m.highalch<=0) continue;
+    const L = LATEST[m.id];
+    const V = VOL[m.id];
+    let buy, btime;
+    if(state.basis==="insta"){ buy = (L&&L.high) || (V&&V.avgHighPrice) || (L&&L.low) || null; btime = L&&L.highTime; }
+    else { buy = (L&&L.low) || (V&&V.avgLowPrice) || (L&&L.high) || null; btime = L&&L.lowTime; }
+    if(!buy || buy<=0) continue;            // no usable price → skip
+    const vol = V ? ((V.highPriceVolume||0)+(V.lowPriceVolume||0)) : 0;
+    const profit = m.highalch - buy - rc;
+    ROWS.push({
+      id:m.id, name:m.name, alch:m.highalch, limit:m.limit||0,
+      buy, btime, vol, profit,
+      roi: profit/buy,
+      breakeven: m.highalch - rc,
+      gphr: profit*ALCH_PER_HOUR,
+      stale: isStale(btime)
+    });
+  }
+}
+
+/* liquidity cap: you can't realistically buy more than the market trades */
+function liqCap(r){
+  if(r.vol<=0) return r.limit||0;           // unknown volume → trust GE limit
+  // assume you can capture up to the 4h-limit if daily volume comfortably exceeds it
+  return Math.max(0, Math.min(r.limit||Infinity, r.vol));
+}
+
+/* ====================== ITEM INDEX (for watchlist lookup + autocomplete) ====================== */
+function indexItems(){
+  NAME2ITEM = {};
+  const names = [];
+  for(const m of MAP){
+    NAME2ITEM[m.name.toLowerCase()] = m;       // resolve any item the user types
+    names.push(m.name);                        // suggest all tradeable items (F2P + members)
+  }
+  const dl = $("itemNames");
+  if(dl) dl.innerHTML = names.sort().map(n=>`<option value="${esc(n)}"></option>`).join("");
+}
+
+/* ====================== FLIP ENGINE ====================== */
+const geTax = sell => Math.min(5_000_000, Math.floor(sell*0.02));   // 2% GE sell tax, capped 5m
+
+function buildFlips(){
+  FLIP_ROWS=[];
+  const now = Date.now()/1000;
+  const scope = state.flipScope || "f2p";
+  for(const m of MAP){
+    if(scope==="f2p" && m.members) continue;      // free-to-play items only
+    if(scope==="members" && !m.members) continue; // members items only
+    const L = LATEST[m.id], V = VOL[m.id];
+    if(!L || !L.high || !L.low) continue;    // need both sides to flip
+    const buy = L.low, sell = L.high;        // buy at insta-sell, sell at insta-buy
+    const tax = geTax(sell);
+    const net = sell - buy - tax;            // CURRENT spread profit (what you'd make right now)
+    const vBuy  = V ? (V.lowPriceVolume||0)  : 0;   // sellers exist → you can buy
+    const vSell = V ? (V.highPriceVolume||0) : 0;   // buyers exist → you can sell
+    const liq = Math.min(vBuy, vSell);              // the binding side (24h)
+    const limit = m.limit||0;
+    // realistic units per 4h: you can't buy a whole day's volume at once — ~one 4h slice of the thin side
+    const capRaw = Math.min(limit||Infinity, Math.ceil(liq/6));
+    const cap = isFinite(capRaw) ? capRaw : 0;
+    const roi = buy>0 ? net/buy : 0;
+
+    // --- MARGIN STABILITY: is this spread normal, or a temporary spike that'll close? ---
+    const tHi = V && V.avgHighPrice, tLo = V && V.avgLowPrice;
+    const typNet = (tHi && tLo) ? (tHi - tLo - geTax(tHi)) : null;   // typical 24h-average margin
+    let consNet, marginFlag;
+    if(typNet != null){
+      consNet = Math.max(0, Math.min(net, typNet));   // trust the SMALLER — never over-promise
+      if(typNet <= 0) marginFlag = "fluke";           // item normally has no margin → risky
+      else if(net > typNet*1.8) marginFlag = "wide";  // spread unusually wide now → may snap shut
+      else marginFlag = "stable";
+    } else {
+      consNet = Math.max(0, Math.floor(net*0.6));      // no 24h average → discount the estimate
+      marginFlag = "unknown";
+    }
+    const freshBuy  = L.lowTime  && (now-L.lowTime)  < 21600;  // <6h
+    const freshSell = L.highTime && (now-L.highTime) < 21600;
+    const fresh = freshBuy && freshSell;
+
+    // --- INTRADAY FLOW (last 1h): can you actually fill an offer RIGHT NOW? ---
+    // recentBuy  = sellers dumping at the low  → units available for YOU to buy
+    // recentSell = buyers paying at the high   → demand for YOU to sell into
+    let recentBuy=null, recentSell=null, flow="unknown", flowScore=2, flowOk=true;
+    if(HAVE_FLOW){
+      const H = H1[m.id];
+      recentBuy  = H ? (H.lowPriceVolume ||0) : 0;
+      recentSell = H ? (H.highPriceVolume||0) : 0;
+      const buyStuck=recentBuy<6, sellStuck=recentSell<6;   // ~nobody on that side this hour
+      const buySlow=recentBuy<30,  sellSlow=recentSell<30;  // trickling
+      if(buyStuck && sellStuck){ flow="quiet";     flowScore=1; flowOk=false; }
+      else if(buyStuck)        { flow="hard-buy";  flowScore=1; flowOk=false; }
+      else if(sellStuck)       { flow="hard-sell"; flowScore=1; flowOk=false; }
+      else if(buySlow)         { flow="slow-buy";  flowScore=3; }
+      else if(sellSlow)        { flow="slow-sell"; flowScore=3; }
+      else                     { flow="live";      flowScore=4; }
+    }
+
+    // --- CONFIDENCE: 24h quality AND live tradeability AND a stable margin ---
+    let conf="low", confScore=1;
+    if(net>0){
+      if(flow==="hard-buy"||flow==="hard-sell"||flow==="quiet"||marginFlag==="fluke"){ conf="low"; confScore=1; }
+      else if(fresh && liq>=500 && roi>=0.02 && roi<=0.5 && (flow==="live"||flow==="unknown") && marginFlag==="stable"){ conf="high"; confScore=3; }
+      else if(flow==="live"||flow==="slow-buy"||flow==="slow-sell"||(flow==="unknown"&&fresh&&liq>=100)){ conf="med"; confScore=2; }
+    }
+
+    FLIP_ROWS.push({
+      id:m.id, name:m.name, buy, sell, tax, net, roi, limit, members:!!m.members,
+      vBuy, vSell, liq, cap, typNet, consNet, marginFlag,
+      per4h:cap*consNet,                       // rank by CONSERVATIVE profit, not a spike
+      conf, confScore, fresh,
+      recentBuy, recentSell, flow, flowScore, flowOk,
+      buyTime:L.lowTime, sellTime:L.highTime,
+      staleBuy:isStale(L.lowTime), staleSell:isStale(L.highTime)
+    });
+  }
+}
+
+function flipView(){
+  const capital = parseGold(state.gold);
+  let rows = FLIP_ROWS.slice();
+  for(const r of rows){
+    r.youBuy = capital>0 ? Math.min(r.cap, Math.floor(capital/r.buy)) : r.cap;
+    if(!isFinite(r.youBuy)) r.youBuy = r.cap;
+    r.youBuy = Math.max(0, r.youBuy);
+    r.youProfit = r.youBuy * r.consNet;               // conservative projection
+    r.youCapital = r.youBuy * r.buy;
+  }
+  const q = state.search.trim().toLowerCase();
+  const maxP = state.maxPrice||0;
+  let view = rows.filter(r=>{
+    if(q) return r.name.toLowerCase().includes(q);    // search overrides filters — always find your item
+    if(state.onlyProfit && r.net<=0) return false;
+    if(r.liq < state.minVol) return false;            // both-sides liquidity
+    if(r.roi*100 < state.minRoi) return false;        // min margin ROI
+    if(maxP>0 && r.buy>maxP) return false;            // risk cap: max gold per item
+    return true;
+  });
+  const k = state.flipSort;
+  view.sort((a,b)=> state.flipSortDir * ((a[k]??0) - (b[k]??0)));
+  return {view, rows, capital};
+}
+
+const GE_SLOTS = 8;          // members get 8 GE offer slots (F2P get 3)
+const DUST_PROFIT = 1000;    // ignore flips earning less than this — not worth a slot
+const MAX_SHARE = 0.4;       // no single flip may use more than 40% of your bankroll (diversify)
+function buildFlipBasket(rows, capital){
+  const maxP = state.maxPrice||0;
+  // candidates: live-tradeable, liquid, a STABLE positive margin (no flukes), pass filters
+  const cand = rows.filter(r=>r.consNet>0 && r.marginFlag!=="fluke" && r.liq>=state.minVol
+                    && r.roi*100>=state.minRoi && r.cap>0 && r.flowOk && (!maxP || r.buy<=maxP))
+                   .sort((a,b)=> b.per4h - a.per4h);   // per4h is conservative (cap × consNet)
+  let rem = capital>0 ? capital : Infinity;
+  const perItemCap = capital>0 ? capital*MAX_SHARE : Infinity;   // diversification cap
+  const dust = Math.max(DUST_PROFIT, capital>0 ? capital*0.0001 : 0);  // scale "worth a slot" to bankroll
+  const geSlots = (state.flipScope==="f2p") ? 3 : GE_SLOTS;      // F2P has 3 GE offer slots, members 8
+  const items=[];
+  for(const r of cand){
+    if(items.length>=geSlots) break;                  // can't run more than your GE slots
+    const afford  = rem===Infinity ? r.cap : Math.floor(rem/r.buy);
+    const divCap  = perItemCap===Infinity ? r.cap : Math.floor(perItemCap/r.buy);
+    const units = Math.min(r.cap, afford, divCap);    // liquidity, capital, AND diversification
+    if(units<=0) continue;
+    const profit = units*r.consNet;                   // conservative expected profit
+    if(profit < dust) continue;                       // skip dust — don't waste a slot
+    items.push({r, units, capital:units*r.buy, profit});
+    if(rem!==Infinity) rem -= units*r.buy;
+  }
+  const tot = items.reduce((a,i)=>({capital:a.capital+i.capital, profit:a.profit+i.profit, units:a.units+i.units}),{capital:0,profit:0,units:0});
+  return {items, tot, capital, slots:geSlots};
+}
+
+/* ====================== BASKET (buy plan) ====================== */
+function buildBasket(rows, budget){
+  // candidates: profitable, pass volume filter, sorted by profit/alch desc (best gp/hr first)
+  const cand = rows.filter(r=>r.profit>0 && r.vol>=state.minVol)
+                   .sort((a,b)=>b.profit-a.profit);
+  let remaining = budget>0 ? budget : Infinity;
+  const items=[];
+  for(const r of cand){
+    const cap = liqCap(r);
+    if(cap<=0) continue;
+    const affordable = remaining===Infinity ? cap : Math.floor(remaining/r.buy);
+    const units = Math.min(cap, affordable);
+    if(units<=0) continue;
+    items.push({r, units, cost:units*r.buy, profit:units*r.profit});
+    if(remaining!==Infinity) remaining -= units*r.buy;
+  }
+  const tot = items.reduce((a,i)=>({cost:a.cost+i.cost, profit:a.profit+i.profit, units:a.units+i.units}),{cost:0,profit:0,units:0});
+  return {items, tot, budget};
+}
+
+/* ====================== RENDER ====================== */
+function colClass(p){ return p>0?"pos":(p<0?"neg":""); }
+function liqClass(v){ return v>=1000?"liq-hi":(v>=100?"liq-mid":"liq-lo"); }
+
+function currentView(){
+  const budget = parseGold(state.gold);
+  let rows = ROWS.slice();
+  for(const r of rows){
+    const cap = liqCap(r);
+    r.youMax = budget>0 ? Math.min(cap, Math.floor(budget/r.buy)) : cap;
+    if(!isFinite(r.youMax)) r.youMax = cap;
+    r.youProfit = Math.max(0,r.youMax)*r.profit;
+  }
+  const q = state.search.trim().toLowerCase();
+  let view = rows.filter(r=>{
+    if(state.onlyProfit && r.profit<=0) return false;
+    if(r.vol < state.minVol) return false;
+    if(q && !r.name.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const k = state.sort;
+  view.sort((a,b)=> state.sortDir * ((a[k]??0) - (b[k]??0)));
+  return {view, rows, budget};
+}
+
+function render(){
+  renderWatch();
+  if(state.mode==="flip"){ if(!FLIP_ROWS.length) return; renderFlip(); return; }
+  if(!ROWS.length) return;
+  const {view, rows, budget} = currentView();
+  renderCards(view, budget);
+  renderBasket(buildBasket(rows, budget), budget);
+  renderTable(view, budget);
+  $("tableCount").textContent = `${view.length} items shown · ${rows.filter(r=>r.profit>0).length} profitable`;
+}
+
+function cardsHTML(cards){
+  return cards.map(c=>`
+    <div class="card ${c.cls}">
+      <div class="k">${c.k}</div>
+      <div class="v ${String(c.v).length>10?'small':''}">${c.v}</div>
+      <div class="x">${c.x}</div>
+    </div>`).join("");
+}
+
+function renderCards(view, budget){
+  const rc = runeCost();
+  const profitable = ROWS.filter(r=>r.profit>0 && r.vol>=state.minVol);
+  const allProfit = ROWS.filter(r=>r.profit>0).length;
+  const best = view[0] || profitable.slice().sort((a,b)=>b.profit-a.profit)[0];
+  const basket = buildBasket(ROWS, budget);
+  const cards = [
+    {k:"Nature rune (per cast)", v:fmt(state.natPrice)+" gp", x:"Live · your main cost", cls:""},
+    {k:"Buyable profit picks", v:profitable.length, x:`of ${allProfit} profitable · rest too illiquid`, cls:""},
+    {k:"Best profit / alch", v:best?("+"+fmt(best.profit)+" gp"):"–", x:best?esc(best.name):"", cls:"profit"},
+    {k:"Buy-plan profit / cycle", v:"+"+fmtShort(basket.tot.profit)+" gp", x:budget>0?`from ${fmtShort(budget)} gp · ${basket.items.length} items`:"enter your gold →", cls:"profit"},
+  ];
+  $("cards").innerHTML = cardsHTML(cards);
+}
+
+function renderBasket(b, budget){
+  const el=$("basket");
+  if(budget<=0){
+    el.innerHTML = `<div class="basket-empty">💡 Enter how much gold you have above, and a complete buy plan will appear here —
+      exactly which items to buy, how many, and your total profit.</div>`;
+    $("basketNote").textContent = "Buys the best items in order of profit, within your gold & the 4-hour GE limits.";
+    return;
+  }
+  if(!b.items.length){
+    el.innerHTML = `<div class="basket-empty">No profitable, liquid items fit this budget &amp; filters. Try lowering "Min 24h volume", or switch to "Patient offer" pricing.</div>`;
+    return;
+  }
+  const casts=b.tot.units;
+  const hours=casts/ALCH_PER_HOUR;
+  const natNeeded=casts, fireNeeded=state.staff?0:casts*FIRE_PER_CAST;
+  const leftover=budget-b.tot.cost;
+  const rows=b.items.map(i=>`
+    <tr>
+      <td><div class="it"><img loading="lazy" src="${ICON(i.r.id)}" onerror="this.style.visibility='hidden'"><span class="nm">${esc(i.r.name)}</span></div></td>
+      <td class="num">${fmt(i.units)}</td>
+      <td class="num">${fmt(i.r.buy)}</td>
+      <td class="num pos">+${fmt(i.r.profit)}</td>
+      <td class="num">${fmt(i.cost)}</td>
+      <td class="num pos">+${fmt(i.profit)}</td>
+    </tr>`).join("");
+  el.innerHTML = `
+    <table class="basket">
+      <thead><tr><th>Item</th><th>Buy qty</th><th>Buy @</th><th>Profit/ea</th><th>Spend</th><th>Profit</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td>TOTAL — ${b.items.length} items</td>
+        <td class="num">${fmt(b.tot.units)}</td>
+        <td></td><td></td>
+        <td class="num">${fmt(b.tot.cost)}</td>
+        <td class="num">+${fmt(b.tot.profit)}</td>
+      </tr></tfoot>
+    </table>
+    <div class="legend" style="margin-top:12px">
+      <span>🌿 Nature runes needed: <b>${fmt(natNeeded)}</b> (≈ ${fmtShort(natNeeded*num(state.natPrice,130))} gp)</span>
+      ${fireNeeded?`<span>🔥 Fire runes: <b>${fmt(fireNeeded)}</b></span>`:`<span>🔥 Fire runes: <b>0</b> (Staff of Fire)</span>`}
+      <span>⏱️ Alch time: <b>~${hours<1?Math.round(hours*60)+" min":hours.toFixed(1)+" hrs"}</b> (${fmt(casts)} casts)</span>
+      <span>✨ Magic XP: <b>${fmtShort(casts*XP_PER_CAST)}</b></span>
+      <span>💵 Gold left over: <b>${fmt(leftover)} gp</b></span>
+    </div>
+    <div class="miniprice" style="margin-top:8px;font-size:12px">
+      💡 After alching this batch you'll have <b>~${fmtShort(budget+b.tot.profit)} gp</b> (your gold back + profit). GE buy limits reset every 4 hours — repeat the plan to keep earning.
+    </div>`;
+  $("basketNote").textContent = `Best ${b.items.length} items for your ${fmtShort(budget)} gp · +${fmtShort(b.tot.profit)} gp profit this cycle`;
+}
+
+const COLS=[
+  {k:"name",  t:"Item",       s:false},
+  {k:"buy",   t:"Buy price",  s:true},
+  {k:"alch",  t:"High alch",  s:true},
+  {k:"profit",t:"Profit/alch",s:true},
+  {k:"roi",   t:"ROI %",      s:true},
+  {k:"breakeven",t:"Pay up to",s:true},
+  {k:"gphr",  t:"GP / hour",  s:true},
+  {k:"limit", t:"4h limit",   s:true},
+  {k:"vol",   t:"24h vol",    s:true},
+  {k:"youMax",t:"You can buy",s:true},
+  {k:"youProfit",t:"Your profit",s:true},
+];
+function renderTable(view, budget){
+  $("theadRow").innerHTML = COLS.map(c=>{
+    const active = (state.sort===c.k) || (c.k==="youProfit"&&state.sort==="youProfit");
+    const ar = active ? `<span class="ar">${state.sortDir<0?"▼":"▲"}</span>` : "";
+    return `<th data-k="${c.k}">${c.t} ${ar}</th>`;
+  }).join("");
+
+  const html = view.slice(0,400).map(r=>{
+    const staleM = r.stale ? `<span class="stale" title="price is stale">⚠</span>` : "";
+    const best = (r===view[0]) ? "best" : "";
+    return `<tr class="${best}">
+      <td><div class="it"><img loading="lazy" src="${ICON(r.id)}" onerror="this.style.visibility='hidden'"><span class="nm">${esc(r.name)}</span></div></td>
+      <td class="num">${fmt(r.buy)} ${staleM}<span class="stale" style="color:var(--dim)"> ${ageStr(r.btime)}</span></td>
+      <td class="num">${fmt(r.alch)}</td>
+      <td class="num ${colClass(r.profit)}">${r.profit>0?"+":""}${fmt(r.profit)}</td>
+      <td class="num ${colClass(r.profit)}">${(r.roi*100).toFixed(1)}%</td>
+      <td class="num"><span class="pill">${fmt(r.breakeven)}</span></td>
+      <td class="num ${colClass(r.profit)}">${r.profit>0?"+":""}${fmtShort(r.gphr)}</td>
+      <td class="num">${fmt(r.limit)}</td>
+      <td class="num ${liqClass(r.vol)}">${r.vol?fmtShort(r.vol):"?"}</td>
+      <td class="num">${budget>0?fmt(r.youMax):"–"}</td>
+      <td class="num ${colClass(r.youProfit)}">${budget>0&&r.youProfit>0?"+"+fmtShort(r.youProfit):"–"}</td>
+    </tr>`;
+  }).join("");
+  $("tbody").innerHTML = html || `<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:30px">No items match your filters.</td></tr>`;
+  // header sort handlers — click toggles direction, switches key
+  const DROPDOWN_KEYS = new Set(["profit","youProfit","roi","vol","gphr","buy"]);
+  document.querySelectorAll("#theadRow th").forEach(th=>{
+    th.onclick=()=>{
+      const k=th.dataset.k; if(k==="name") return;
+      if(state.sort===k) state.sortDir = -state.sortDir;
+      else { state.sort=k; state.sortDir = (k==="buy") ? 1 : -1; }
+      if(DROPDOWN_KEYS.has(k)) $("sort").value = k;
+      saveState();
+      render();
+    };
+  });
+}
+
+/* ====================== FLIP RENDER ====================== */
+function renderFlip(){
+  const {view, rows, capital} = flipView();
+  renderFlipCards(view, rows, capital);
+  renderFlipBasket(buildFlipBasket(rows, capital), capital);
+  renderFlipTable(view, capital);
+  const quality = rows.filter(r=>r.conf!=="low" && r.net>0).length;
+  $("tableCount").textContent = `${view.length} flips shown · ${quality} quality (high/med confidence)`;
+}
+
+function renderFlipCards(view, rows, capital){
+  const quality = rows.filter(r=>r.conf!=="low" && r.net>0);
+  const highConf = quality.filter(r=>r.conf==="high");
+  const bestRoi = (highConf.length?highConf:quality).slice().sort((a,b)=>b.roi-a.roi)[0];
+  const bestP4  = quality.slice().sort((a,b)=>b.per4h-a.per4h)[0];
+  const basket  = buildFlipBasket(rows, capital);
+  const cards=[
+    {k:"Quality flips now", v:quality.length, x:`tradeable both sides · of ${rows.length}`, cls:""},
+    {k:"Best margin ROI", v:bestRoi?Math.round(bestRoi.roi*100)+"%":"–", x:bestRoi?esc(bestRoi.name)+" · +"+fmt(bestRoi.net)+"/ea":"", cls:"profit"},
+    {k:"Best profit / 4h", v:bestP4?"+"+fmtShort(bestP4.per4h):"–", x:bestP4?esc(bestP4.name):"", cls:"profit"},
+    {k:"Flip-plan profit / 4h", v:"+"+fmtShort(basket.tot.profit), x:capital>0?`from ${fmtShort(capital)} gp · ${basket.items.length} flips`:"enter your gold →", cls:"profit"},
+  ];
+  $("cards").innerHTML = cardsHTML(cards);
+}
+
+function renderFlipBasket(b, capital){
+  const el=$("basket");
+  if(capital<=0){
+    el.innerHTML = `<div class="basket-empty">💡 Enter your gold (your flipping capital) above — you'll get an exact plan: which items to buy, how many, the buy &amp; sell price for each, and your expected profit per 4-hour cycle.</div>`;
+    $("basketNote").textContent = "Allocates your capital to the best flips by profit-per-4h, within GE buy limits & live both-sides liquidity.";
+    return;
+  }
+  if(!b.items.length){
+    el.innerHTML = `<div class="basket-empty">No quality flips fit your capital &amp; filters right now. Try lowering "Min liquidity" or "Min margin ROI".</div>`;
+    $("basketNote").textContent = "No flips match — loosen the filters.";
+    return;
+  }
+  const rows=b.items.map(i=>`
+    <tr>
+      <td><div class="it"><img loading="lazy" src="${ICON(i.r.id)}" onerror="this.style.visibility='hidden'"><span class="nm">${esc(i.r.name)}</span></div></td>
+      <td class="num">${fmt(i.units)}</td>
+      <td class="num">${fmt(i.r.buy)}</td>
+      <td class="num">${fmt(i.r.sell)}</td>
+      <td class="num pos">+${fmt(i.r.consNet)}</td>
+      <td class="num">${fmt(i.capital)}</td>
+      <td class="num pos">+${fmt(i.profit)}</td>
+    </tr>`).join("");
+  const deployPct = capital>0 ? b.tot.capital/capital : 0;
+  const underUsed = deployPct < 0.6 && (capital-b.tot.capital) > 1_000_000;
+  el.innerHTML = `
+    <table class="basket">
+      <thead><tr><th>Item</th><th>Buy qty</th><th>Buy @</th><th>Sell @</th><th>Net/ea</th><th>Capital</th><th>Profit/4h</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td>TOTAL — ${b.items.length} flips</td>
+        <td class="num">${fmt(b.tot.units)}</td><td></td><td></td><td></td>
+        <td class="num">${fmt(b.tot.capital)}</td>
+        <td class="num pos">+${fmt(b.tot.profit)}</td>
+      </tr></tfoot>
+    </table>
+    <div class="legend" style="margin-top:12px">
+      <span>💰 Capital used: <b>${fmt(b.tot.capital)} gp</b> of ${fmtShort(capital)}</span>
+      <span>📈 Profit / 4h cycle: <b class="pos">+${fmt(b.tot.profit)} gp</b></span>
+      <span>🗓️ ~6 cycles/day: <b class="pos">~${fmtShort(b.tot.profit*6)}/day</b></span>
+      <span>🎰 GE slots used: <b>${b.items.length}/${b.slots}</b> (${state.flipScope==="f2p"?"F2P cap — members get 8":"members cap"})</span>
+      <span>💵 Capital left: <b>${fmt(capital-b.tot.capital)} gp</b></span>
+    </div>
+    <div class="miniprice" style="margin-top:8px;font-size:12px">
+      💡 Place <b>buy</b> offers at "Buy @" and <b>sell</b> offers at "Sell @", then walk away — AFK. Profit uses the <b>conservative margin</b> (the smaller of the current spread and the item's typical 24h margin), so it won't over-promise on temporary spreads. Only <b>live-tradeable, stable</b> flips are included. If a buy doesn't fill in ~5 min, bump it a few gp. Limits reset every 4h.
+      ${underUsed?`<br><b style="color:var(--amber)">⚠ Only ${fmtShort(b.tot.capital)} of your ${fmtShort(capital)} fits good flips right now.</b> The rest is idle reserve — ${state.flipScope==="f2p"?"F2P markets are too small to absorb it. Switch <b>Item universe</b> to <b>Members</b> to put it to work.":"try raising <b>Max price per item</b> or lowering <b>Min ROI</b> to deploy more."}`:""}
+    </div>`;
+  $("basketNote").textContent = `Best ${b.items.length} flips for ${fmtShort(capital)} gp · +${fmtShort(b.tot.profit)}/4h (~${fmtShort(b.tot.profit*6)}/day)`;
+}
+
+const FLIP_COLS=[
+  {k:"name",      t:"Item"},
+  {k:"buy",       t:"Buy @"},
+  {k:"sell",      t:"Sell @"},
+  {k:"net",       t:"Net/item"},
+  {k:"roi",       t:"ROI %"},
+  {k:"limit",     t:"4h limit"},
+  {k:"liq",       t:"24h liq"},
+  {k:"flowScore", t:"Tradeable now"},
+  {k:"confScore", t:"Confidence"},
+  {k:"youBuy",    t:"You can buy"},
+  {k:"youProfit", t:"Profit / 4h"},
+];
+function flowBadge(r){
+  if(r.flow==="unknown") return `<span class="conf" style="color:var(--dim);border-color:var(--line);background:#1d1913">—</span>`;
+  const MAP={ "live":["flow-live","🟢 Live"], "slow-buy":["flow-slow","🟡 Slow buy"], "slow-sell":["flow-slow","🟡 Slow sell"],
+    "hard-buy":["flow-hard","🔴 Hard buy"], "hard-sell":["flow-hard","🔴 Hard sell"], "quiet":["flow-hard","🔴 Quiet"] };
+  const [cls,label]=MAP[r.flow]||["flow-slow",r.flow];
+  const tip=`last 1h — ${fmt(r.recentBuy)} sellers to buy from · ${fmt(r.recentSell)} buyers to sell to`;
+  return `<span class="conf ${cls}" title="${tip}">${label}</span>`;
+}
+function renderFlipTable(view, capital){
+  $("theadRow").innerHTML = FLIP_COLS.map(c=>{
+    const active = state.flipSort===c.k;
+    const ar = active ? `<span class="ar">${state.flipSortDir<0?"▼":"▲"}</span>` : "";
+    return `<th data-k="${c.k}">${c.t} ${ar}</th>`;
+  }).join("");
+  const html = view.slice(0,400).map(r=>{
+    const best = (r===view[0]) ? "best" : "";
+    const buyStale  = r.staleBuy  ? `<span class="stale" title="buy price stale">⚠</span>` : "";
+    const sellStale = r.staleSell ? `<span class="stale" title="sell price stale">⚠</span>` : "";
+    const confCls = r.conf==="high"?"conf-high":(r.conf==="med"?"conf-med":"conf-low");
+    const marginMark = r.marginFlag==="wide" ? `<span class="stale" title="spread is wider than usual (~+${fmt(r.typNet)} typical) — may snap back">⚡</span>`
+      : r.marginFlag==="fluke" ? `<span class="stale" title="no typical margin — this spread is a fluke, risky">⚠</span>` : "";
+    return `<tr class="${best}">
+      <td><div class="it"><img loading="lazy" src="${ICON(r.id)}" onerror="this.style.visibility='hidden'"><span class="nm">${esc(r.name)}</span></div></td>
+      <td class="num">${fmt(r.buy)} ${buyStale}</td>
+      <td class="num">${fmt(r.sell)} ${sellStale}</td>
+      <td class="num ${colClass(r.net)}">${r.net>0?"+":""}${fmt(r.net)} ${marginMark}</td>
+      <td class="num ${colClass(r.net)}">${(r.roi*100).toFixed(1)}%</td>
+      <td class="num">${fmt(r.limit)}</td>
+      <td class="num ${liqClass(r.liq)}">${r.liq?fmtShort(r.liq):"0"}</td>
+      <td class="num">${flowBadge(r)}</td>
+      <td class="num"><span class="conf ${confCls}">${r.conf.toUpperCase()}</span></td>
+      <td class="num">${capital>0?fmt(r.youBuy):fmt(r.cap)}</td>
+      <td class="num ${colClass(r.youProfit)}">${r.youProfit>0?"+"+fmtShort(r.youProfit):"–"}</td>
+    </tr>`;
+  }).join("");
+  $("tbody").innerHTML = html || `<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:30px">No flips match your filters. Try lowering Min liquidity / Min ROI.</td></tr>`;
+  const FLIP_DD = new Set(["per4h","roi","net","youProfit","liq","buy"]);
+  document.querySelectorAll("#theadRow th").forEach(th=>{
+    th.onclick=()=>{
+      const k=th.dataset.k; if(k==="name") return;
+      if(state.flipSort===k) state.flipSortDir = -state.flipSortDir;
+      else { state.flipSort=k; state.flipSortDir = (k==="buy") ? 1 : -1; }
+      if(FLIP_DD.has(k)) $("sort").value = k;
+      saveState();
+      render();
+    };
+  });
+}
+
+/* ====================== WATCHLIST (my open orders) ====================== */
+function renderWatch(){
+  const el=$("watchBody"); if(!el) return;
+  const list = Array.isArray(state.watch) ? state.watch : (state.watch=[]);
+  if(!list.length){
+    el.innerHTML = `<div class="basket-empty">No tracked orders yet. After you buy something, add it below — you'll see your <b>break-even sell price</b>, the <b>live sell price</b>, and your <b>profit</b> here, even after the list refreshes.</div>`;
+    return;
+  }
+  let tInv=0, tPL=0, anyLive=false;
+  const rows = list.map((p,idx)=>{
+    const L = LATEST && LATEST[p.id];
+    const H = H1 && H1[p.id];
+    const high = L && L.high ? L.high : null;
+    const be = Math.ceil(p.paid/0.98);                 // must sell above this to beat the 2% tax
+    const netEa = high!=null ? (high - p.paid - geTax(high)) : null;
+    const pl = netEa!=null ? netEa*p.qty : null;
+    const buyers = HAVE_FLOW ? (H ? (H.highPriceVolume||0) : 0) : null;   // demand to sell INTO
+    tInv += p.paid*p.qty;
+    if(pl!=null){ tPL += pl; anyLive=true; }
+    let rec="…", recCls="";
+    if(high!=null){
+      if(netEa<=0){ rec="⏳ Hold — below break-even"; recCls="flow-hard"; }
+      else if(buyers!=null && buyers<6){ rec="🔴 Few buyers right now"; recCls="flow-hard"; }
+      else if(buyers!=null && buyers<30){ rec=`🟡 Sell ~${fmt(high)} (slow)`; recCls="flow-slow"; }
+      else { rec=`✅ Sell ~${fmt(high)}`; recCls="flow-live"; }
+    }
+    return `<tr>
+      <td><div class="it"><img loading="lazy" src="${ICON(p.id)}" onerror="this.style.visibility='hidden'"><span class="nm">${esc(p.name)}</span></div></td>
+      <td class="num">${fmt(p.qty)}</td>
+      <td class="num">${fmt(p.paid)}</td>
+      <td class="num"><span class="pill">${fmt(be)}</span></td>
+      <td class="num">${high!=null?fmt(high):"–"}</td>
+      <td class="num ${netEa>0?'pos':(netEa<0?'neg':'')}">${netEa!=null?(netEa>0?'+':'')+fmt(netEa):'–'}</td>
+      <td class="num ${pl>0?'pos':(pl<0?'neg':'')}">${pl!=null?(pl>0?'+':'')+fmtShort(pl):'–'}</td>
+      <td class="num"><span class="conf ${recCls}">${rec}</span></td>
+      <td class="num"><span class="wdel" data-idx="${idx}" title="remove">✕</span></td>
+    </tr>`;
+  }).join("");
+  el.innerHTML = `
+    <table class="basket">
+      <thead><tr><th>Item</th><th>Qty</th><th>Paid</th><th>Break-even</th><th>Sell now @</th><th>Net/ea</th><th>P/L total</th><th>What to do</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td>TOTAL — ${list.length} order${list.length>1?'s':''}</td>
+        <td></td><td></td><td></td><td></td><td></td>
+        <td class="num ${tPL>0?'pos':(tPL<0?'neg':'')}">${anyLive?((tPL>0?'+':'')+fmt(tPL)):'–'}</td>
+        <td colspan="2"></td>
+      </tr></tfoot>
+    </table>
+    <div class="miniprice" style="margin-top:8px">💰 Invested: <b>${fmt(tInv)} gp</b> · live profit/loss if sold now (after 2% tax): <b class="${tPL>=0?'pos':'neg'}">${anyLive?((tPL>=0?'+':'')+fmt(tPL)+' gp'):'…'}</b>. <b>"Hold"</b> means the current sell price is below your break-even — wait for it to recover, don't sell at a loss.</div>`;
+  el.querySelectorAll(".wdel").forEach(b=>b.onclick=()=>{ state.watch.splice(+b.dataset.idx,1); saveState(); renderWatch(); });
+}
+
+function addWatch(){
+  const nameRaw=$("wName").value.trim();
+  const paid=Math.floor(+$("wPaid").value);
+  const qty=Math.floor(+$("wQty").value);
+  const msg=$("wMsg");
+  const fail=t=>{ msg.textContent=t; msg.className="watch-msg err"; };
+  if(!nameRaw) return fail("Type an item name.");
+  const it = NAME2ITEM[nameRaw.toLowerCase()];
+  if(!it) return fail(`"${nameRaw}" not found — pick from the suggestions.`);
+  if(!(paid>0)) return fail("Enter the price you paid.");
+  if(!(qty>0)) return fail("Enter a quantity.");
+  if(!Array.isArray(state.watch)) state.watch=[];
+  state.watch.push({id:it.id, name:it.name, paid, qty});
+  saveState();
+  $("wName").value=""; $("wPaid").value=""; $("wQty").value="";
+  msg.textContent=`Added ${it.name}.`; msg.className="watch-msg ok";
+  $("wName").focus();
+  renderWatch();
+}
+
+/* ====================== MODE SWITCHING ====================== */
+function populateSort(){
+  const sel=$("sort");
+  if(state.mode==="flip"){
+    sel.innerHTML =
+      `<option value="per4h">Profit per 4h (best)</option>`+
+      `<option value="roi">Margin ROI %</option>`+
+      `<option value="net">Net profit / item</option>`+
+      `<option value="youProfit">Profit per 4h (your gold)</option>`+
+      `<option value="liq">Liquidity</option>`+
+      `<option value="buy">Cheapest buy</option>`;
+    sel.value = state.flipSort;
+  } else {
+    sel.innerHTML =
+      `<option value="profit">Profit per alch</option>`+
+      `<option value="youProfit">Total profit (your gold)</option>`+
+      `<option value="roi">Return on gold (ROI %)</option>`+
+      `<option value="vol">24h volume</option>`+
+      `<option value="gphr">Profit per hour</option>`+
+      `<option value="buy">Cheapest buy price</option>`;
+    sel.value = state.sort;
+  }
+}
+function applyModeUI(){
+  const flip = state.mode==="flip";
+  document.body.classList.toggle("mode-flip", flip);
+  document.body.classList.toggle("mode-alch", !flip);
+  document.querySelectorAll("#modeTabs .tab").forEach(t=>t.classList.toggle("on", t.dataset.mode===state.mode));
+  const scopeLbl = {f2p:"F2P", members:"Members", all:"All"}[state.flipScope||"f2p"];
+  $("appSub").textContent   = flip ? "Live GE flips · margins, live tradeability, and exactly what to buy" : "Live OSRS Grand Exchange prices · what to buy, and the max price to pay";
+  $("tableTitle").textContent  = flip ? `💱 All ${scopeLbl} flips` : "📜 All F2P alchable items";
+  $("basketTitle").textContent = flip ? "🛒 Your recommended flip plan" : "🛒 Your recommended buy plan";
+  document.querySelectorAll("#scopeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.scope===(state.flipScope||"f2p")));
+  $("minVolLabel").textContent = flip ? "📊 Min liquidity (per side)" : "📊 Min 24h volume (liquidity)";
+  $("minVolHelp").textContent  = flip ? "Lowest of the daily buy-volume and sell-volume. Both sides must be liquid or you'll get stuck holding. ~100 = safe · 50 = more options." : "Hides items with fewer than this many combined buys + sells per day. ~100 = comfortably buyable · try 50 for more options · 300+ to be stricter. Higher = safer.";
+  populateSort();
+}
+function setMode(mode){
+  if(mode!=="alch" && mode!=="flip") mode="alch";
+  state.mode=mode;
+  applyModeUI();
+  saveState();
+  render();
+}
+
+/* ====================== STATUS / UI WIRING ====================== */
+function setStatus(cls,txt){ const d=$("dot"); d.className="dot "+(cls||""); $("statusText").textContent=txt; }
+
+function saveState(){ try{ localStorage.setItem(LS, JSON.stringify(state)); }catch(e){} }
+function loadState(){
+  try{
+    const s=JSON.parse(localStorage.getItem(LS)||"null");
+    if(s) Object.assign(state, s);
+  }catch(e){}
+  if(!Array.isArray(state.watch)) state.watch=[];
+  $("gold").value = state.gold||"";
+  $("staff").checked = state.staff;
+  $("minVol").value = state.minVol;
+  $("search").value = state.search||"";
+  $("sort").value = state.sort||"profit";
+  $("onlyProfit").checked = state.onlyProfit;
+  // restore custom rune prices so the visible field matches what's actually used in calculations
+  if(state.natPrice != null) $("natPrice").value = state.natPrice;
+  if(state.firePrice != null) $("firePrice").value = state.firePrice;
+  $("minRoi").value = state.minRoi;
+  $("maxPrice").value = state.maxPrice>0 ? fmt(state.maxPrice) : "";
+  $("fireWrap").style.display = state.staff ? "none":"block";
+  document.querySelectorAll("#basisSeg button").forEach(b=>b.classList.toggle("on", b.dataset.basis===state.basis));
+  applyModeUI();
+  renderWatch();
+}
+
+const debounce=(fn,ms)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};};
+const reRender = debounce(()=>{ saveState(); render(); }, 120);
+const reBuild  = debounce(()=>{ saveState(); build(); render(); }, 120);
+const reBuildFlips = debounce(()=>{ saveState(); buildFlips(); render(); }, 120);
+
+function bindResetLinks(){
+  const nr=$("natReset"); if(nr) nr.onclick=()=>{ state.natAuto=true; loadAll(); };
+  const fr=$("fireReset"); if(fr) fr.onclick=()=>{ state.fireAuto=true; loadAll(); };
+}
+
+function wire(){
+  $("gold").addEventListener("input", e=>{ state.gold=e.target.value; reRender(); });
+  document.querySelectorAll(".chip[data-gold]").forEach(c=>c.onclick=()=>{ state.gold=c.dataset.gold; $("gold").value=fmt(+c.dataset.gold); reRender(); });
+  document.querySelectorAll("#basisSeg button").forEach(b=>b.onclick=()=>{
+    state.basis=b.dataset.basis;
+    document.querySelectorAll("#basisSeg button").forEach(x=>x.classList.toggle("on",x===b));
+    reBuild();
+  });
+  $("staff").addEventListener("change", e=>{ state.staff=e.target.checked; $("fireWrap").style.display=e.target.checked?"none":"block"; reBuild(); });
+  $("natPrice").addEventListener("input", e=>{ state.natPrice=+e.target.value; state.natAuto=false; $("natMini").innerHTML=`Live · <a id="natReset">use live</a>`; bindResetLinks(); reBuild(); });
+  $("firePrice").addEventListener("input", e=>{ state.firePrice=+e.target.value; state.fireAuto=false; reBuild(); });
+  $("minVol").addEventListener("input", e=>{ state.minVol=Math.max(0,+e.target.value||0); reRender(); });
+  $("search").addEventListener("input", e=>{ state.search=e.target.value; reRender(); });
+  $("sort").addEventListener("change", e=>{
+    const v=e.target.value;
+    if(state.mode==="flip"){ state.flipSort=v; state.flipSortDir=(v==="buy")?1:-1; }
+    else { state.sort=v; state.sortDir=(v==="buy")?1:-1; }
+    reRender();
+  });
+  $("onlyProfit").addEventListener("change", e=>{ state.onlyProfit=e.target.checked; reRender(); });
+  $("minRoi").addEventListener("input", e=>{ state.minRoi=Math.max(0,+e.target.value||0); reRender(); });
+  document.querySelectorAll("#scopeSeg button").forEach(b=>b.onclick=()=>{
+    state.flipScope=b.dataset.scope;
+    document.querySelectorAll("#scopeSeg button").forEach(x=>x.classList.toggle("on",x===b));
+    $("tableTitle").textContent = `💱 All ${({f2p:"F2P",members:"Members",all:"All"})[state.flipScope]} flips`;
+    reBuildFlips();
+  });
+  $("maxPrice").addEventListener("input", e=>{ state.maxPrice=parseGold(e.target.value); reRender(); });
+  document.querySelectorAll(".chip[data-maxp]").forEach(c=>c.onclick=()=>{ state.maxPrice=+c.dataset.maxp; $("maxPrice").value=state.maxPrice>0?fmt(state.maxPrice):""; reRender(); });
+  document.querySelectorAll("#modeTabs .tab").forEach(t=>t.onclick=()=>setMode(t.dataset.mode));
+  $("wAdd").onclick=addWatch;
+  ["wName","wPaid","wQty"].forEach(id=>$(id).addEventListener("keydown",e=>{ if(e.key==="Enter") addWatch(); }));
+  $("refreshBtn").onclick=()=>loadAll();
+}
+
+/* ====================== INIT ====================== */
+loadState();
+wire();
+loadAll();
+// auto-refresh every 90s (API caches 60s)
+setInterval(()=>{ if(document.visibilityState==="visible") loadAll(); }, 90000);
+</script>
+</body>
+</html>
