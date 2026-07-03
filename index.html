@@ -197,6 +197,9 @@
   details.skipped summary:hover{color:var(--gold)}
   .skiplist{margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--muted);max-height:220px;overflow:auto}
   .skiplist li{margin:3px 0}
+  .trackBtn{background:#2b4326;border:1px solid #4e7a44;color:var(--green2);border-radius:5px;font-weight:bold;cursor:pointer;font-family:inherit;font-size:12px;padding:2px 9px;line-height:1.3;white-space:nowrap}
+  .trackBtn:hover{background:#365a2f;color:#c6ffc6}
+  .holdtag{font-size:10px;color:var(--gold2);background:#00000033;border:1px solid var(--line);border-radius:8px;padding:0 6px;margin-left:6px;white-space:nowrap}
 
   /* Watchlist */
   .watch-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
@@ -1074,17 +1077,18 @@ function renderFlipBasket(b, capital){
       <td class="num">${fmtHrs(i.r.roundTripHrs)}</td>
       <td class="num">${fmt(i.capital)}</td>
       <td class="num pos">+${fmt(i.profit)}</td>
+      <td><button class="trackBtn" data-wname="${esc(i.r.name)}" data-wpaid="${i.r.buy}" data-wqty="${i.units}" title="Bought it? Add to My open orders">＋ Track</button></td>
     </tr>`).join("");
   const underUsed = (b.tot.capital/capital) < 0.6 && (capital-b.tot.capital) > 1_000_000;
   el.innerHTML = `
     <table class="basket">
-      <thead><tr><th>Item</th><th>Grade</th><th>Buy qty</th><th>Buy @</th><th>Sell @</th><th>Fills in</th><th>Capital</th><th>Profit/cycle</th></tr></thead>
+      <thead><tr><th>Item</th><th>Grade</th><th>Buy qty</th><th>Buy @</th><th>Sell @</th><th>Fills in</th><th>Capital</th><th>Profit/cycle</th><th>Bought?</th></tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr>
         <td>TOTAL — ${b.items.length} flips</td><td></td>
         <td class="num">${fmt(b.tot.units)}</td><td></td><td></td><td></td>
         <td class="num">${fmt(b.tot.capital)}</td>
-        <td class="num pos">+${fmt(b.tot.profit)}</td>
+        <td class="num pos">+${fmt(b.tot.profit)}</td><td></td>
       </tr></tfoot>
     </table>
     <div class="legend" style="margin-top:12px">
@@ -1098,6 +1102,7 @@ function renderFlipBasket(b, capital){
       ${underUsed?`<br><b style="color:var(--amber)">⚠ Only ${fmtShort(b.tot.capital)} of your ${fmtShort(capital)} fits safe flips right now.</b> ${state.flipScope==="f2p"?"F2P is too small for big capital — switch <b>Item universe → Members</b>.":"Try <b>Balanced</b> mode or a higher <b>Max price</b>."}`:""}
     </div>
     ${skippedHTML()}`;
+  bindTrackBtns(el);
   $("basketNote").textContent = `${b.items.length} safe flips for ${fmtShort(capital)} gp · ~+${fmtShort(b.tot.profit)}/cycle`;
 }
 
@@ -1122,19 +1127,22 @@ function flowBadge(r){
   return `<span class="conf ${cls}" title="${tip}">${label}</span>`;
 }
 function renderFlipTable(view, capital){
+  const held = new Set((state.watch||[]).map(w=>w.id));
   $("theadRow").innerHTML = FLIP_COLS.map(c=>{
     const active = state.flipSort===c.k;
     const ar = active ? `<span class="ar">${state.flipSortDir<0?"▼":"▲"}</span>` : "";
     return `<th data-k="${c.k}">${c.t} ${ar}</th>`;
-  }).join("");
+  }).join("") + `<th>Bought?</th>`;
   const html = view.slice(0,400).map(r=>{
     const best = (r===view[0]) ? "best" : "";
     const buyStale  = r.staleBuy  ? `<span class="stale" title="buy price stale">⚠</span>` : "";
     const sellStale = r.staleSell ? `<span class="stale" title="sell price stale">⚠</span>` : "";
     const marginMark = r.marginFlag==="wide" ? `<span class="stale" title="spread wider than usual (~+${fmt(r.typNet)} typical) — may snap back">⚡</span>` : "";
     const chips = (r.reasons||[]).slice(0,3).map(x=>`<span class="rchip">${x}</span>`).join("");
+    const holding = held.has(r.id) ? `<span class="holdtag" title="you're tracking this in My open orders">📌 in orders</span>` : "";
+    const qty = capital>0 ? r.youBuy : r.cap;
     return `<tr class="${best}">
-      <td><div class="it"><img loading="lazy" src="${ICON(r.id)}" onerror="this.style.visibility='hidden'"><div><span class="nm">${esc(r.name)}</span>${chips?`<div class="rchips">${chips}</div>`:""}</div></div></td>
+      <td><div class="it"><img loading="lazy" src="${ICON(r.id)}" onerror="this.style.visibility='hidden'"><div><span class="nm">${esc(r.name)}${holding}</span>${chips?`<div class="rchips">${chips}</div>`:""}</div></div></td>
       <td>${gradeBadge(r)}</td>
       <td class="num">${fmt(r.buy)} ${buyStale}</td>
       <td class="num">${fmt(r.sell)} ${sellStale}</td>
@@ -1144,9 +1152,11 @@ function renderFlipTable(view, capital){
       <td class="num ${liqClass(r.liq)}">${r.liq?fmtShort(r.liq):"0"}</td>
       <td class="num">${capital>0?fmt(r.youBuy):fmt(r.cap)}</td>
       <td class="num ${colClass(r.youProfit)}">${r.youProfit>0?"+"+fmtShort(r.youProfit):"–"}</td>
+      <td><button class="trackBtn" data-wname="${esc(r.name)}" data-wpaid="${r.buy}" data-wqty="${qty>0?qty:1}" title="Bought it? Add to My open orders">＋ Track</button></td>
     </tr>`;
   }).join("");
-  $("tbody").innerHTML = html || `<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:30px">No flips match this mode. Try <b>Balanced</b> or <b>All</b> mode, or lower Min liquidity / ROI.</td></tr>`;
+  $("tbody").innerHTML = html || `<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:30px">No flips match this mode. Try <b>Balanced</b> or <b>All</b> mode, or lower Min liquidity / ROI.</td></tr>`;
+  bindTrackBtns($("tbody"));
   const FLIP_DD = new Set(["evScore","gradeRank","roi","net","youProfit","liq","buy","roundTripHrs"]);
   document.querySelectorAll("#theadRow th").forEach(th=>{
     th.onclick=()=>{
@@ -1234,7 +1244,7 @@ function renderWatch(){
     <div class="miniprice" style="margin-top:6px">
       ${bleeding>0?`<b style="color:var(--amber)">⚠ ${fmtShort(bleeding)} gp is in falling/stuck positions — cutting now stops the loss.</b> `:""}Advice is <b>trend-based</b>: it says <b>Hold</b> only when the price is actually recovering (last 5 min ticking up); otherwise <b>Cut</b>. Riding a falling item down is exactly what cost you gold last time.
     </div>`;
-  el.querySelectorAll(".wdel").forEach(b=>b.onclick=()=>{ state.watch.splice(+b.dataset.idx,1); saveState(); renderWatch(); });
+  el.querySelectorAll(".wdel").forEach(b=>b.onclick=()=>{ state.watch.splice(+b.dataset.idx,1); saveState(); render(); });
 }
 
 function addWatch(){
@@ -1252,9 +1262,29 @@ function addWatch(){
   state.watch.push({id:it.id, name:it.name, paid, qty});
   saveState();
   $("wName").value=""; $("wPaid").value=""; $("wQty").value="";
-  msg.textContent=`Added ${it.name}.`; msg.className="watch-msg ok";
+  msg.textContent=`✅ Added ${it.name}.`; msg.className="watch-msg ok";
   $("wName").focus();
-  renderWatch();
+  render();   // refresh watchlist AND the flip table's "📌 in orders" markers
+}
+
+// One-click "＋ Track" from a flip row/plan: prefill the add-order form with the item, its buy price,
+// and the recommended qty, scroll to it, and focus the price so the user just confirms what they paid.
+function prefillWatch(name, buy, qty){
+  if(!$("wName")) return;
+  $("wName").value = name;
+  $("wPaid").value = buy;
+  $("wQty").value  = qty;
+  const panel = $("watchBody").closest(".panel");
+  if(panel) panel.scrollIntoView({behavior:"smooth", block:"start"});
+  const pp=$("wPaid"); pp.focus(); pp.select();
+  const already = (state.watch||[]).some(w=>w.name.toLowerCase()===name.toLowerCase());
+  $("wMsg").textContent = already ? `Note: ${name} is already in your orders — this adds a second lot.` : `Set the price you actually paid (or press Enter to accept ${fmt(buy)}), then Add.`;
+  $("wMsg").className = "watch-msg";
+}
+function bindTrackBtns(scope){
+  (scope||document).querySelectorAll(".trackBtn").forEach(b=>{
+    b.onclick=(e)=>{ e.stopPropagation(); prefillWatch(b.dataset.wname, +b.dataset.wpaid, +b.dataset.wqty); };
+  });
 }
 
 /* ====================== MODE SWITCHING ====================== */
