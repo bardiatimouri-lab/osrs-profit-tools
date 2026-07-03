@@ -259,6 +259,16 @@
         </div>
 
         <div class="ctl alch-only">
+          <label>🌍 Item universe</label>
+          <div class="seg" id="alchScopeSeg">
+            <button data-ascope="f2p" class="on">F2P</button>
+            <button data-ascope="members">Members</button>
+            <button data-ascope="all">All</button>
+          </div>
+          <div class="miniprice">F2P = free items only. <b>Members</b> = members-only alchables (often higher value). All = both. Pick Members if you're a member.</div>
+        </div>
+
+        <div class="ctl alch-only">
           <label>🏷️ Buying speed (price basis)</label>
           <div class="seg" id="basisSeg">
             <button data-basis="insta" class="on">Instant buy</button>
@@ -476,7 +486,7 @@ const state = {
   sort:"profit", onlyProfit:true, natPrice:null, firePrice:null,
   natAuto:true, fireAuto:true, sortDir:-1,
   mode:"alch", minRoi:2, flipSort:"evScore", flipSortDir:-1,
-  flipScope:"f2p", maxPrice:0, flipMode:"safe",
+  flipScope:"f2p", maxPrice:0, flipMode:"safe", alchScope:"f2p",
   watch:[]
 };
 let NAME2ITEM = {};   // lowercase item name -> mapping entry
@@ -585,8 +595,10 @@ const num = (v,d)=>{ const n=Number(v); return isFinite(n)&&n>=0 ? n : d; };
 function build(){
   ROWS=[];
   const rc = runeCost();
+  const scope = state.alchScope || "f2p";
   for(const m of MAP){
-    if(m.members) continue;                 // FREE-TO-PLAY only
+    if(scope==="f2p" && m.members) continue;      // free-to-play items only
+    if(scope==="members" && !m.members) continue; // members items only
     if(!m.highalch || m.highalch<=0) continue;
     const L = LATEST[m.id];
     const V = VOL[m.id];
@@ -1317,8 +1329,10 @@ function applyModeUI(){
   document.body.classList.toggle("mode-alch", !flip);
   document.querySelectorAll("#modeTabs .tab").forEach(t=>t.classList.toggle("on", t.dataset.mode===state.mode));
   const scopeLbl = {f2p:"F2P", members:"Members", all:"All"}[state.flipScope||"f2p"];
+  const alchLbl = {f2p:"F2P", members:"Members", all:"All"}[state.alchScope||"f2p"];
   $("appSub").textContent   = flip ? "Live GE flips · margins, live tradeability, and exactly what to buy" : "Live OSRS Grand Exchange prices · what to buy, and the max price to pay";
-  $("tableTitle").textContent  = flip ? `💱 All ${scopeLbl} flips` : "📜 All F2P alchable items";
+  $("tableTitle").textContent  = flip ? `💱 All ${scopeLbl} flips` : `📜 All ${alchLbl} alchable items`;
+  document.querySelectorAll("#alchScopeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.ascope===(state.alchScope||"f2p")));
   $("basketTitle").textContent = flip ? "🛒 Your recommended flip plan" : "🛒 Your recommended buy plan";
   document.querySelectorAll("#scopeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.scope===(state.flipScope||"f2p")));
   document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.fmode===(state.flipMode||"safe")));
@@ -1400,6 +1414,12 @@ function wire(){
     document.querySelectorAll("#scopeSeg button").forEach(x=>x.classList.toggle("on",x===b));
     $("tableTitle").textContent = `💱 All ${({f2p:"F2P",members:"Members",all:"All"})[state.flipScope]} flips`;
     reBuildFlips();
+  });
+  document.querySelectorAll("#alchScopeSeg button").forEach(b=>b.onclick=()=>{
+    state.alchScope=b.dataset.ascope;
+    document.querySelectorAll("#alchScopeSeg button").forEach(x=>x.classList.toggle("on",x===b));
+    $("tableTitle").textContent = `📜 All ${({f2p:"F2P",members:"Members",all:"All"})[state.alchScope]} alchable items`;
+    saveState(); build(); render();
   });
   document.querySelectorAll("#modeSeg button").forEach(b=>b.onclick=()=>{
     state.flipMode=b.dataset.fmode;
