@@ -423,7 +423,7 @@
         </div>
         <div class="legend flip-only">
           <span><b>Grade</b>: <span class="grade grade-a">A</span> safe &amp; fast &amp; steady · <span class="grade grade-b">B</span> solid · <span class="grade grade-c">C</span> one soft flaw · <span class="grade grade-d">D</span> risky. The plan only buys A/B.</span>
-          <span><b>Fills in</b> = est. time to buy <i>and</i> sell your whole order — shorter = less exposure to the price drifting.</span>
+          <span><b>Fills in</b> = est. time to buy <i>and</i> sell your whole order, <i>including queue competition</i> — you're not the only flipper bidding. Shorter = less exposure. <b>Bid +1–2 gp over "Buy @" to jump the queue.</b></span>
           <span><b>Net/item</b> = current profit per flip after the 2% tax. <span class="stale">⚡</span>=spread wider than usual. Profit/cycle uses the <b>risk-adjusted</b> (trend-discounted) margin.</span>
           <span>🛡️ <b>Falling knives are refused before you see them</b> — anything trending down is hidden (see "Refused N flips" under the plan).</span>
         </div>
@@ -449,7 +449,8 @@
         <li><b>Net profit = Sell price − Buy price − 2% GE tax</b> (the tax is taken on the sale). The app already subtracts it, so "Net/item" is your real profit.</li>
         <li><b>The grade (A–F) is the whole story.</b> Each flip is scored on four things: is the price <b>steady or rising</b> (not falling), how <b>fast</b> it fills, how <b>deep</b> the market is, and how <b>stable</b> the margin is. <span class="grade grade-a">A</span>/<span class="grade grade-b">B</span> = buy it. <span class="grade grade-c">C</span> = only if you're paying attention. <span class="grade grade-d">D</span>/<span class="grade grade-f">F</span> = don't.</li>
         <li><b>🛡️ The falling-knife rule (why this is different).</b> A buy offer fills <i>fastest</i> exactly when the price is dropping — sellers dump into your bid, then it keeps falling and your resale target is gone. So the tool <b>refuses to recommend anything trending down</b>, no matter how fat the margin looks. Open "Refused N flips" under the plan to see every one it skipped and why.</li>
-        <li><b>Fast beats fat.</b> The plan prefers a small margin that round-trips in minutes over a big margin that takes hours — because the longer your gold sits in an offer, the more the price can move against you. "Fills in" shows the estimate.</li>
+        <li><b>Fast beats fat.</b> The plan prefers a small margin that round-trips in minutes over a big margin that takes hours — because the longer your gold sits in an offer, the more the price can move against you. "Fills in" shows the estimate (queue competition included).</li>
+        <li><b>Nothing is an instant buy — the margin IS the payment for waiting.</b> "Buy @" is a patient bid: the GE fills the <i>highest</i> bid first, then oldest-first at the same price, and other flippers are camped at the same number. <b>Bid 1–2 gp above "Buy @"</b> to jump ahead of everyone at that price (ask 1–2 gp under "Sell @" on the way out). Paying the full "Sell @" price to buy instantly erases the profit — don't.</li>
         <li><b>It's not guaranteed</b> like alching. Prices drift and offers sit. The plan diversifies (max 40% on one item) and the profit shown is deliberately <b>risk-adjusted</b> (trend + volatility discounted) so it under-promises.</li>
         <li><b>Flip mode: Safe / Balanced / All.</b> <b>Safe</b> (default) shows only A/B, refuses any downtrend, and demands deep, fast markets — start here. Balanced adds C. All shows everything for browsing (the plan still only buys A/B).</li>
         <li><b>Item universe (F2P / Members / All):</b> F2P items are cheap, so they can only absorb a few million of capital. <b>Members</b> items are higher-value with fatter margins and soak up big bankrolls — switch to Members if you're a member with lots of gold and the plan says your capital is under-used.</li>
@@ -710,7 +711,8 @@ function buildFlips(){
     const rSell = (HAVE_FLOW && H) ? (H.highPriceVolume||0) : vSell/24;  // units/hour you can SELL
     const capUnits = Math.min(cap, capital>0 ? Math.floor(capital/buy) : cap);
     const units = Math.max(1, (isFinite(capUnits)&&capUnits>0) ? capUnits : (cap||1));
-    const roundTripHrs = Math.max(0.05, units/Math.max(1,rBuy) + units/Math.max(1,rSell));
+    // ×2: you SHARE the flow with other flippers queued at the same price — assume you capture ~half
+    const roundTripHrs = Math.max(0.05, 2*(units/Math.max(1,rBuy) + units/Math.max(1,rSell)));
     const per4h  = Math.round(units*expEdge);
     const evScore = per4h/roundTripHrs;                        // EV per hour of exposure — RANK BY THIS
 
@@ -1110,7 +1112,7 @@ function renderFlipBasket(b, capital){
       <span>💵 Capital left: <b>${fmt(capital-b.tot.capital)} gp</b></span>
     </div>
     <div class="miniprice" style="margin-top:8px;font-size:12px">
-      🛡️ <b>Every flip here passed the falling-knife check.</b> The tool refuses anything trending down — because a slow buy fills fastest right when the price is dropping, which is exactly what cost you gold before. Profit shown is the <b>risk-adjusted</b> estimate (trend &amp; volatility discounted), so it under-promises. Place buys at "Buy @", sells at "Sell @"; if a buy doesn't fill in ~5 min, bump a few gp.
+      🛡️ <b>Every flip here passed the falling-knife check.</b> The tool refuses anything trending down — because a slow buy fills fastest right when the price is dropping, which is exactly what cost you gold before. Profit shown is the <b>risk-adjusted</b> estimate (trend &amp; volatility discounted), so it under-promises. ⚠️ <b>"Buy @" is a patient bid, not an instant purchase</b> — you're in a queue with other flippers at that price. <b>Bid 1–2 gp above "Buy @" to jump the whole queue</b> (and ask 1–2 gp under "Sell @" to sell first). If an offer still sits ~10 min, bump again or move on.
       ${underUsed?`<br><b style="color:var(--amber)">⚠ Only ${fmtShort(b.tot.capital)} of your ${fmtShort(capital)} fits safe flips right now.</b> ${state.flipScope==="f2p"?"F2P is too small for big capital — switch <b>Item universe → Members</b>.":"Try <b>Balanced</b> mode or a higher <b>Max price</b>."}`:""}
     </div>
     ${skippedHTML()}`;
@@ -1156,11 +1158,11 @@ function renderFlipTable(view, capital){
     return `<tr class="${best}">
       <td><div class="it"><img loading="lazy" src="${ICON(r.id)}" onerror="this.style.visibility='hidden'"><div><span class="nm">${esc(r.name)}${holding}</span>${chips?`<div class="rchips">${chips}</div>`:""}</div></div></td>
       <td>${gradeBadge(r)}</td>
-      <td class="num">${fmt(r.buy)} ${buyStale}</td>
-      <td class="num">${fmt(r.sell)} ${sellStale}</td>
+      <td class="num" title="patient bid — offer ${fmt(r.buy+1)} to jump the queue">${fmt(r.buy)} ${buyStale}</td>
+      <td class="num" title="ask ${fmt(r.sell-1)} to sell ahead of the queue">${fmt(r.sell)} ${sellStale}</td>
       <td class="num ${colClass(r.net)}">${r.net>0?"+":""}${fmt(r.net)} ${marginMark}</td>
       <td class="num ${colClass(r.net)}">${(r.roi*100).toFixed(1)}%</td>
-      <td class="num">${fmtHrs(r.roundTripHrs)}</td>
+      <td class="num" title="incl. queue competition — bump +1-2gp if it sits ~10 min">${fmtHrs(r.roundTripHrs)}</td>
       <td class="num ${liqClass(r.liq)}">${r.liq?fmtShort(r.liq):"0"}</td>
       <td class="num">${capital>0?fmt(r.youBuy):fmt(r.cap)}</td>
       <td class="num ${colClass(r.youProfit)}">${r.youProfit>0?"+"+fmtShort(r.youProfit):"–"}</td>
