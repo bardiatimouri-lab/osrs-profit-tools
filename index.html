@@ -278,6 +278,12 @@
         </div>
 
         <div class="ctl alch-only">
+          <label>⚡ Sure-fill offers: profit to lock in (gp)</label>
+          <input type="number" id="alchLock" min="1" step="25">
+          <div class="miniprice">Place your buy at the <b>⚡ Offer @</b> price instead of the market price: it fills near-instantly (the GE refunds you down to the real asking price), and <b>every fill is guaranteed to profit at least this much per alch</b>. Higher = safer margin but fewer instant fills.</div>
+        </div>
+
+        <div class="ctl alch-only">
           <label>🔥 Runes per cast</label>
           <label class="toggle">
             <input type="checkbox" id="staff" checked>
@@ -443,6 +449,7 @@
         <li><b>GE buy limits</b> cap how many of one item you can buy every 4 hours. The buy plan respects them, so you spread gold across several items.</li>
         <li><b>Your gold recycles.</b> Each alch returns ~99% of what you paid <i>plus</i> the profit, so after a batch you have your gold back and can buy again. The 4-hour limits, not your gold, are usually the real cap — repeat the plan each cycle.</li>
         <li><b>Tip:</b> "Patient offer" pricing buys cheaper (more profit) but fills slower. "Instant buy" is the realistic cost to grab items right now.</li>
+        <li><b>⚡ Why "Instant buy" sometimes isn't — and the sure-fill trick.</b> The shown price is the <i>last recorded</i> trade; if the market moved since, an offer at it just sits. The GE's rule saves you: when offers cross, the trade happens at the <b>older</b> offer's price — so offering <i>above</i> market is safe (you pay the seller's price, the GE refunds the rest). For alching, place buys at the <b>⚡ Offer @</b> price (break-even − your lock-in): near-instant fills, usually at the cheaper market price, and even the worst case profits your lock-in amount. You cannot overpay into a loss.</li>
       </ul>
       <ul class="flip-only">
         <li><b>Flipping</b> = buy an item at the low (insta-sell) price, then resell at the high (insta-buy) price, pocketing the spread. It's <b>AFK</b> — you place offers and walk away, no clicking like alching.</li>
@@ -487,7 +494,7 @@ const state = {
   sort:"profit", onlyProfit:true, natPrice:null, firePrice:null,
   natAuto:true, fireAuto:true, sortDir:-1,
   mode:"alch", minRoi:2, flipSort:"evScore", flipSortDir:-1,
-  flipScope:"f2p", maxPrice:0, flipMode:"safe", alchScope:"f2p",
+  flipScope:"f2p", maxPrice:0, flipMode:"safe", alchScope:"f2p", alchLock:150,
   watch:[]
 };
 let NAME2ITEM = {};   // lowercase item name -> mapping entry
@@ -609,11 +616,15 @@ function build(){
     if(!buy || buy<=0) continue;            // no usable price → skip
     const vol = V ? ((V.highPriceVolume||0)+(V.lowPriceVolume||0)) : 0;
     const profit = m.highalch - buy - rc;
+    const breakeven = m.highalch - rc;
+    const lock = Math.max(1, num(state.alchLock, 150));
+    const fastOffer = breakeven - lock;           // offer here → fills fast, every fill locks ≥lock profit
     ROWS.push({
       id:m.id, name:m.name, alch:m.highalch, limit:m.limit||0,
       buy, btime, vol, profit,
       roi: profit/buy,
-      breakeven: m.highalch - rc,
+      breakeven,
+      fastOffer: (fastOffer > buy) ? fastOffer : null,   // margin thinner than the lock → no sure-fill possible
       gphr: profit*ALCH_PER_HOUR,
       stale: isStale(btime)
     });
@@ -952,18 +963,19 @@ function renderBasket(b, budget){
       <td><div class="it"><img loading="lazy" src="${ICON(i.r.id)}" onerror="this.style.visibility='hidden'"><span class="nm">${esc(i.r.name)}</span></div></td>
       <td class="num">${fmt(i.units)}</td>
       <td class="num">${fmt(i.r.buy)}</td>
+      <td class="num">${i.r.fastOffer?`<b style="color:var(--gold)">${fmt(i.r.fastOffer)}</b>`:`<span style="color:var(--dim)">–</span>`}</td>
       <td class="num pos">+${fmt(i.r.profit)}</td>
       <td class="num">${fmt(i.cost)}</td>
       <td class="num pos">+${fmt(i.profit)}</td>
     </tr>`).join("");
   el.innerHTML = `
     <table class="basket">
-      <thead><tr><th>Item</th><th>Buy qty</th><th>Buy @</th><th>Profit/ea</th><th>Spend</th><th>Profit</th></tr></thead>
+      <thead><tr><th>Item</th><th>Buy qty</th><th>Market @</th><th>⚡ Offer @</th><th>Profit/ea</th><th>Spend</th><th>Profit</th></tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr>
         <td>TOTAL — ${b.items.length} items</td>
         <td class="num">${fmt(b.tot.units)}</td>
-        <td></td><td></td>
+        <td></td><td></td><td></td>
         <td class="num">${fmt(b.tot.cost)}</td>
         <td class="num">+${fmt(b.tot.profit)}</td>
       </tr></tfoot>
@@ -976,6 +988,7 @@ function renderBasket(b, budget){
       <span>💵 Gold left over: <b>${fmt(leftover)} gp</b></span>
     </div>
     <div class="miniprice" style="margin-top:8px;font-size:12px">
+      ⚡ <b>Place your buy offers at the "⚡ Offer @" price, not the market price.</b> It looks like overpaying — it isn't: the GE fills you at the seller's (lower) price and refunds the difference, so it fills near-instantly and <b>every fill still profits ≥${fmt(Math.max(1,num(state.alchLock,150)))} gp/alch</b>. The "Market @" price can be minutes stale, which is why offers at it sometimes sit unfilled.<br>
       💡 After alching this batch you'll have <b>~${fmtShort(budget+b.tot.profit)} gp</b> (your gold back + profit). GE buy limits reset every 4 hours — repeat the plan to keep earning.
     </div>`;
   $("basketNote").textContent = `Best ${b.items.length} items for your ${fmtShort(budget)} gp · +${fmtShort(b.tot.profit)} gp profit this cycle`;
@@ -988,6 +1001,7 @@ const COLS=[
   {k:"profit",t:"Profit/alch",s:true},
   {k:"roi",   t:"ROI %",      s:true},
   {k:"breakeven",t:"Pay up to",s:true},
+  {k:"fastOffer",t:"⚡ Offer @",s:true},
   {k:"gphr",  t:"GP / hour",  s:true},
   {k:"limit", t:"4h limit",   s:true},
   {k:"vol",   t:"24h vol",    s:true},
@@ -1011,6 +1025,7 @@ function renderTable(view, budget){
       <td class="num ${colClass(r.profit)}">${r.profit>0?"+":""}${fmt(r.profit)}</td>
       <td class="num ${colClass(r.profit)}">${(r.roi*100).toFixed(1)}%</td>
       <td class="num"><span class="pill">${fmt(r.breakeven)}</span></td>
+      <td class="num">${r.fastOffer?`<b style="color:var(--gold)">${fmt(r.fastOffer)}</b>`:`<span style="color:var(--dim)" title="margin is thinner than your lock-in — no sure-fill price exists">–</span>`}</td>
       <td class="num ${colClass(r.profit)}">${r.profit>0?"+":""}${fmtShort(r.gphr)}</td>
       <td class="num">${fmt(r.limit)}</td>
       <td class="num ${liqClass(r.vol)}">${r.vol?fmtShort(r.vol):"?"}</td>
@@ -1018,7 +1033,7 @@ function renderTable(view, budget){
       <td class="num ${colClass(r.youProfit)}">${budget>0&&r.youProfit>0?"+"+fmtShort(r.youProfit):"–"}</td>
     </tr>`;
   }).join("");
-  $("tbody").innerHTML = html || `<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:30px">No items match your filters.</td></tr>`;
+  $("tbody").innerHTML = html || `<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:30px">No items match your filters.</td></tr>`;
   // header sort handlers — click toggles direction, switches key
   const DROPDOWN_KEYS = new Set(["profit","youProfit","roi","vol","gphr","buy"]);
   document.querySelectorAll("#theadRow th").forEach(th=>{
@@ -1373,6 +1388,7 @@ function loadState(){
   if(state.natPrice != null) $("natPrice").value = state.natPrice;
   if(state.firePrice != null) $("firePrice").value = state.firePrice;
   $("minRoi").value = state.minRoi;
+  $("alchLock").value = state.alchLock || 150;
   $("maxPrice").value = state.maxPrice>0 ? fmt(state.maxPrice) : "";
   $("fireWrap").style.display = state.staff ? "none":"block";
   document.querySelectorAll("#basisSeg button").forEach(b=>b.classList.toggle("on", b.dataset.basis===state.basis));
@@ -1402,6 +1418,7 @@ function wire(){
   $("natPrice").addEventListener("input", e=>{ state.natPrice=+e.target.value; state.natAuto=false; $("natMini").innerHTML=`Live · <a id="natReset">use live</a>`; bindResetLinks(); reBuild(); });
   $("firePrice").addEventListener("input", e=>{ state.firePrice=+e.target.value; state.fireAuto=false; reBuild(); });
   $("minVol").addEventListener("input", e=>{ state.minVol=Math.max(0,+e.target.value||0); reRender(); });
+  $("alchLock").addEventListener("input", e=>{ state.alchLock=Math.max(1,+e.target.value||150); reBuild(); });
   $("search").addEventListener("input", e=>{ state.search=e.target.value; reRender(); });
   $("sort").addEventListener("change", e=>{
     const v=e.target.value;
