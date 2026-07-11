@@ -670,7 +670,10 @@ function buildFlips(){
     if(scope==="members" && !m.members) continue; // members items only
     const L = LATEST[m.id], V = VOL[m.id], H = H1 && H1[m.id], M = H5 && H5[m.id];
     if(!L || !L.high || !L.low) continue;    // need both sides to flip
-    const buy = L.low, sell = L.high;        // buy at insta-sell, sell at insta-buy
+    // realistic prices: never trust a single (possibly stale) print — cap both sides at the hour's average.
+    // A lone high print on a slipping item is exactly how you overpay into a dump.
+    const buy  = (H && H.avgLowPrice)  ? Math.min(L.low,  Math.round(H.avgLowPrice))  : L.low;
+    const sell = (H && H.avgHighPrice) ? Math.min(L.high, Math.round(H.avgHighPrice)) : L.high;
     const tax = geTax(sell);
     const net = sell - buy - tax;            // CURRENT after-tax spread (what you'd make right now)
     const roi = buy>0 ? net/buy : 0;
@@ -746,6 +749,7 @@ function buildFlips(){
     // Order matters: knife FIRST so a downtrend is labelled as such (not "no profit").
     let hideReason=null;
     if(knife)                                      hideReason=`price down ${Math.round(mom1h*100)}% this hour — a falling knife`;
+    else if(m.limit==null)                         hideReason="no GE buy limit on record — usually brand-new content still finding its price";
     else if(net<=0)                                hideReason="no profit after the 2% tax";
     else if(roundTripHrs>4)                        hideReason=`too slow — ${fmtHrs(roundTripHrs)} to round-trip, your gold sits exposed`;
     else if(marginFlag==="fluke")                  hideReason="fluke margin — normally has none, likely won't hold";
@@ -793,6 +797,56 @@ function buildFlips(){
     else FLIP_ROWS.push(row);
   }
   SKIPPED.sort((a,b)=>b.net-a.net);
+  preflightGen++; preflightPasses=0;   // new data → allow a fresh pre-flight round
+}
+
+/* ====================== PRE-FLIGHT: multi-day history check (the Letvek fix) ======================
+   Intraday signals can't see a 10-day-old hype item plateauing at its all-time high, or a slow
+   multi-day bleed. Before an item is allowed in the plan, pull its per-item price history and veto:
+   - items with <21 days of history (new content in price discovery — exactly what Letvek was)
+   - items down >4% over the last 3 days (decay too slow for hourly signals)
+   Bounded: only the top ~12 A/B candidates, ≤4 concurrent, cached 10 min. API miss → unchecked, never a false veto. */
+const PREFLIGHT = {};                 // id -> {t, checked, ok, reason, ageDays, drift3d}
+let preflightGen = 0, preflightPasses = 0;
+async function preflightOne(id){
+  const c = PREFLIGHT[id];
+  if(c && (Date.now()-c.t) < 600e3) return c;
+  const out = { t: Date.now(), checked:false, ok:true, reason:null };
+  try{
+    // 6h timestep → ~91 days of history in one request (1h only holds ~15 days, which made every item look "new")
+    const j = await getJSON(`${API}/timeseries?timestep=6h&id=${id}`);
+    const pts = (j.data||[]).filter(p=>mid(p)!=null);
+    if(pts.length >= 6){
+      out.checked = true;
+      const ageDays = (pts[pts.length-1].timestamp - pts[0].timestamp)/86400;
+      out.ageDays = Math.round(ageDays);
+      const cutoff = pts[pts.length-1].timestamp - 72*3600;
+      const mids = pts.filter(p=>p.timestamp>=cutoff).map(mid);
+      if(mids.length >= 6){
+        const k = Math.max(1, Math.floor(mids.length/6));
+        const early = mids.slice(0,k).reduce((a,b)=>a+b,0)/k;
+        const late  = mids.slice(-k).reduce((a,b)=>a+b,0)/k;
+        out.drift3d = (late-early)/early;
+      }
+      if(ageDays < 21) { out.ok=false; out.reason=`only ${out.ageDays} days of price history — new items are still finding their price`; }
+      else if(out.drift3d!=null && out.drift3d < -0.04){ out.ok=false; out.reason=`down ${Math.abs(out.drift3d*100).toFixed(1)}% over 3 days — a slow bleed hourly signals can't see`; }
+    }
+  }catch(e){ /* leave unchecked — never veto on missing data */ }
+  PREFLIGHT[id]=out; return out;
+}
+async function runPreflight(){
+  if(state.mode!=="flip" || preflightPasses>=2) return;
+  preflightPasses++;
+  const gen = preflightGen;
+  const cands = FLIP_ROWS.filter(r=>(r.grade==="A"||r.grade==="B") && r.flowOk)
+                         .sort((a,b)=>b.evScore-a.evScore).slice(0,12)
+                         .filter(r=>{ const c=PREFLIGHT[r.id]; return !(c && (Date.now()-c.t)<600e3); });
+  if(!cands.length) return;
+  for(let i=0;i<cands.length;i+=4){
+    await Promise.all(cands.slice(i,i+4).map(r=>preflightOne(r.id)));
+    if(gen!==preflightGen) return;      // superseded by a newer data load
+  }
+  if(gen===preflightGen){ render(); runPreflight(); }   // re-rank, then one pass for replacements
 }
 
 const MODE_FLOORS = {
@@ -815,6 +869,10 @@ function flipView(){
     r.youBuy = Math.max(0, r.youBuy);
     r.youProfit = Math.round(r.youBuy * r.expEdge);   // risk-adjusted projection
     r.youCapital = r.youBuy * r.buy;
+    // pre-flight verdict: a history-vetoed item may not wear an A/B/C badge
+    const pf = PREFLIGHT[r.id];
+    r.pf = (pf && (Date.now()-pf.t)<600e3) ? pf : null;
+    if(r.pf && r.pf.checked && !r.pf.ok && r.gradeRank>2){ r.grade="D"; r.gradeRank=2; }
   }
   const q = state.search.trim().toLowerCase();
   const maxP = state.maxPrice||0;
@@ -835,11 +893,12 @@ function flipView(){
 
 const GE_SLOTS = 8;          // members get 8 GE offer slots (F2P get 3)
 const DUST_PROFIT = 1000;    // ignore flips earning less than this — not worth a slot
-const MAX_SHARE = 0.4;       // no single flip may use more than 40% of your bankroll (diversify)
+const MAX_SHARE = 0.25;      // no single flip may use more than 25% of your bankroll (Letvek was 32% — too much)
 function buildFlipBasket(rows, capital){
   const maxP = state.maxPrice||0;
   // candidates: only GRADE A/B (safe & fast, trend-checked), sorted by EV per hour of exposure
   const cand = rows.filter(r=>(r.grade==="A"||r.grade==="B") && r.flowOk && r.cap>0
+                    && !(PREFLIGHT[r.id] && PREFLIGHT[r.id].checked && !PREFLIGHT[r.id].ok)   // history-vetoed → never in the plan
                     && r.liq>=state.minVol && r.roi*100>=state.minRoi && (!maxP || r.buy<=maxP))
                    .sort((a,b)=> b.evScore - a.evScore);
   let rem = capital>0 ? capital : Infinity;
@@ -1066,7 +1125,9 @@ function renderFlip(){
   renderFlipBasket(buildFlipBasket(rows, capital), capital);
   renderFlipTable(view, capital);
   const g = c => rows.filter(r=>r.grade===c).length;
-  $("tableCount").textContent = `${view.length} shown · ${g("A")} A · ${g("B")} B · ${SKIPPED.length} refused`;
+  const vetoed = rows.filter(r=>r.pf && r.pf.checked && !r.pf.ok).length;
+  $("tableCount").textContent = `${view.length} shown · ${g("A")} A · ${g("B")} B · ${SKIPPED.length} refused${vetoed?` · ✈️ ${vetoed} history-vetoed`:""}`;
+  runPreflight();   // async multi-day history check on plan candidates; re-renders when done
 }
 
 function renderFlipCards(view, rows, capital){
@@ -1127,7 +1188,7 @@ function renderFlipBasket(b, capital){
       <span>💵 Capital left: <b>${fmt(capital-b.tot.capital)} gp</b></span>
     </div>
     <div class="miniprice" style="margin-top:8px;font-size:12px">
-      🛡️ <b>Every flip here passed the falling-knife check.</b> The tool refuses anything trending down — because a slow buy fills fastest right when the price is dropping, which is exactly what cost you gold before. Profit shown is the <b>risk-adjusted</b> estimate (trend &amp; volatility discounted), so it under-promises. ⚠️ <b>"Buy @" is a patient bid, not an instant purchase</b> — you're in a queue with other flippers at that price. <b>Bid 1–2 gp above "Buy @" to jump the whole queue</b> (and ask 1–2 gp under "Sell @" to sell first). If an offer still sits ~10 min, bump again or move on.
+      🛡️ <b>Every flip here passed the falling-knife check</b>, and plan candidates get a <b>✈️ pre-flight history check</b>: brand-new items still finding their price (like Letvek) and multi-day slow-bleeders are <b>vetoed before they can reach this plan</b>. Prices use the hour's average, never a single stale print. Profit is the <b>risk-adjusted</b> estimate, so it under-promises. ⚠️ <b>"Buy @" is a patient bid</b> — bid 1–2 gp above it to jump the queue (ask 1–2 gp under "Sell @" to sell first). If an offer sits ~10 min on a <b>steady/rising</b> item, bump again — <b>never chase a price that's slipping.</b>
       ${underUsed?`<br><b style="color:var(--amber)">⚠ Only ${fmtShort(b.tot.capital)} of your ${fmtShort(capital)} fits safe flips right now.</b> ${state.flipScope==="f2p"?"F2P is too small for big capital — switch <b>Item universe → Members</b>.":"Try <b>Balanced</b> mode or a higher <b>Max price</b>."}`:""}
     </div>
     ${skippedHTML()}`;
@@ -1167,7 +1228,9 @@ function renderFlipTable(view, capital){
     const buyStale  = r.staleBuy  ? `<span class="stale" title="buy price stale">⚠</span>` : "";
     const sellStale = r.staleSell ? `<span class="stale" title="sell price stale">⚠</span>` : "";
     const marginMark = r.marginFlag==="wide" ? `<span class="stale" title="spread wider than usual (~+${fmt(r.typNet)} typical) — may snap back">⚡</span>` : "";
-    const chips = (r.reasons||[]).slice(0,3).map(x=>`<span class="rchip">${x}</span>`).join("");
+    const pfChip = (r.pf && r.pf.checked && !r.pf.ok) ? [`<span class="rchip" style="color:#ff9a93;border-color:#7a3030" title="${esc(r.pf.reason)}">🛑 ${esc((r.pf.reason||"").split("—")[0].trim())}</span>`]
+                 : (r.pf && r.pf.checked && r.pf.ok) ? [`<span class="rchip" title="multi-day history verified: ${r.pf.ageDays}d old${r.pf.drift3d!=null?", 3-day drift "+(r.pf.drift3d*100).toFixed(1)+"%":""}">✈️ history ✓</span>`] : [];
+    const chips = pfChip.concat((r.reasons||[]).slice(0,3).map(x=>`<span class="rchip">${x}</span>`)).join("");
     const holding = held.has(r.id) ? `<span class="holdtag" title="you're tracking this in My open orders">📌 in orders</span>` : "";
     const qty = capital>0 ? r.youBuy : r.cap;
     return `<tr class="${best}">
