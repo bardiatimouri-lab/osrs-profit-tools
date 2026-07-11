@@ -749,7 +749,8 @@ function buildFlips(){
     // Order matters: knife FIRST so a downtrend is labelled as such (not "no profit").
     let hideReason=null;
     if(knife)                                      hideReason=`price down ${Math.round(mom1h*100)}% this hour — a falling knife`;
-    else if(m.limit==null)                         hideReason="no GE buy limit on record — usually brand-new content still finding its price";
+    else if(m.limit==null && !(PREFLIGHT[m.id] && PREFLIGHT[m.id].checked && PREFLIGHT[m.id].ok))
+                                                   hideReason="no GE buy limit on record — hidden until price history confirms it isn't brand-new content";
     else if(net<=0)                                hideReason="no profit after the 2% tax";
     else if(roundTripHrs>4)                        hideReason=`too slow — ${fmtHrs(roundTripHrs)} to round-trip, your gold sits exposed`;
     else if(marginFlag==="fluke")                  hideReason="fluke margin — normally has none, likely won't hold";
@@ -815,10 +816,12 @@ async function preflightOne(id){
   try{
     // 6h timestep → ~91 days of history in one request (1h only holds ~15 days, which made every item look "new")
     const j = await getJSON(`${API}/timeseries?timestep=6h&id=${id}`);
-    const pts = (j.data||[]).filter(p=>mid(p)!=null);
+    const raw = j.data || [];
+    const pts = raw.filter(p=>mid(p)!=null);
     if(pts.length >= 6){
       out.checked = true;
-      const ageDays = (pts[pts.length-1].timestamp - pts[0].timestamp)/86400;
+      // age from the RAW span — sparse one-sided buckets must not hide an item's youth
+      const ageDays = (raw[raw.length-1].timestamp - raw[0].timestamp)/86400;
       out.ageDays = Math.round(ageDays);
       const cutoff = pts[pts.length-1].timestamp - 72*3600;
       const mids = pts.filter(p=>p.timestamp>=cutoff).map(mid);
@@ -830,23 +833,38 @@ async function preflightOne(id){
       }
       if(ageDays < 21) { out.ok=false; out.reason=`only ${out.ageDays} days of price history — new items are still finding their price`; }
       else if(out.drift3d!=null && out.drift3d < -0.04){ out.ok=false; out.reason=`down ${Math.abs(out.drift3d*100).toFixed(1)}% over 3 days — a slow bleed hourly signals can't see`; }
+    } else if(raw.length){
+      // fetch succeeded but under 6 two-sided 6h buckets — that IS evidence: brand-new or too thin. Veto, don't fail open.
+      out.checked = true;
+      const rawAge = (raw[raw.length-1].timestamp - raw[0].timestamp)/86400;
+      out.ageDays = Math.round(rawAge);
+      out.ok = false;
+      out.reason = rawAge < 21 ? `only ${out.ageDays<1?"<1":out.ageDays} day${out.ageDays===1?"":"s"} of price history — new items are still finding their price`
+                               : "too little two-sided trade history to verify — market too thin to trust";
     }
-  }catch(e){ /* leave unchecked — never veto on missing data */ }
+  }catch(e){ /* true API miss → leave unchecked — never veto on missing data */ }
   PREFLIGHT[id]=out; return out;
 }
 async function runPreflight(){
   if(state.mode!=="flip" || preflightPasses>=2) return;
   preflightPasses++;
   const gen = preflightGen;
-  const cands = FLIP_ROWS.filter(r=>(r.grade==="A"||r.grade==="B") && r.flowOk)
-                         .sort((a,b)=>b.evScore-a.evScore).slice(0,12)
-                         .filter(r=>{ const c=PREFLIGHT[r.id]; return !(c && (Date.now()-c.t)<600e3); });
+  const isStale = c => !c || (Date.now()-c.t) >= 600e3;
+  // top plan candidates needing a (re)check
+  const top = FLIP_ROWS.filter(r=>(r.grade==="A"||r.grade==="B") && r.flowOk)
+                       .sort((a,b)=>b.evScore-a.evScore).slice(0,12)
+                       .filter(r=>isStale(PREFLIGHT[r.id]));
+  // stale vetoes get re-verified so a recovered/aged item can earn its grade back (vetoed rows sit at D, outside `top`)
+  const revisit = FLIP_ROWS.filter(r=>{ const c=PREFLIGHT[r.id]; return c && c.checked && !c.ok && isStale(c); });
+  // a few hidden no-limit items: history can prove they're established, un-hiding them next data load
+  const noLimit = SKIPPED.filter(r=>(r.hideReason||"").startsWith("no GE buy limit") && isStale(PREFLIGHT[r.id])).slice(0,4);
+  const cands = [...new Map([...top, ...revisit, ...noLimit].map(r=>[r.id,r])).values()];
   if(!cands.length) return;
   for(let i=0;i<cands.length;i+=4){
     await Promise.all(cands.slice(i,i+4).map(r=>preflightOne(r.id)));
     if(gen!==preflightGen) return;      // superseded by a newer data load
   }
-  if(gen===preflightGen){ render(); runPreflight(); }   // re-rank, then one pass for replacements
+  if(gen===preflightGen) render();      // re-rank; render→renderFlip fires the second pass for replacements
 }
 
 const MODE_FLOORS = {
@@ -869,9 +887,10 @@ function flipView(){
     r.youBuy = Math.max(0, r.youBuy);
     r.youProfit = Math.round(r.youBuy * r.expEdge);   // risk-adjusted projection
     r.youCapital = r.youBuy * r.buy;
-    // pre-flight verdict: a history-vetoed item may not wear an A/B/C badge
-    const pf = PREFLIGHT[r.id];
-    r.pf = (pf && (Date.now()-pf.t)<600e3) ? pf : null;
+    // pre-flight verdict: a history-vetoed item may not wear an A/B/C badge.
+    // Vetoes hold until a FRESH re-check overwrites them (never silently expire a safety verdict);
+    // preflightOne's own 10-min TTL governs when re-checks happen.
+    r.pf = PREFLIGHT[r.id] || null;
     if(r.pf && r.pf.checked && !r.pf.ok && r.gradeRank>2){ r.grade="D"; r.gradeRank=2; }
   }
   const q = state.search.trim().toLowerCase();
