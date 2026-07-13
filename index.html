@@ -376,8 +376,8 @@
     </div>
   </div>
 
-  <!-- WATCHLIST -->
-  <div class="panel">
+  <!-- WATCHLIST (flip mode only — alch has its own log) -->
+  <div class="panel flip-only">
     <div class="hd">
       <h2>📌 My open orders</h2>
       <span class="note">Track what you bought — break-even, live sell price &amp; profit, surviving every refresh. Saved in your browser.</span>
@@ -495,7 +495,7 @@ const state = {
   natAuto:true, fireAuto:true, sortDir:-1,
   mode:"alch", minRoi:2, flipSort:"evScore", flipSortDir:-1,
   flipScope:"f2p", maxPrice:0, flipMode:"safe", alchScope:"f2p", alchLock:150,
-  watch:[]
+  watch:[], alchLog:[]
 };
 let NAME2ITEM = {};   // lowercase item name -> mapping entry
 
@@ -637,6 +637,17 @@ function liqCap(r){
   // assume you can capture up to the 4h-limit if daily volume comfortably exceeds it
   return Math.max(0, Math.min(r.limit||Infinity, r.vol));
 }
+
+/* ====================== ALCH BUY-LIMIT TRACKING + WINNERS LOG ====================== */
+const GE_LIMIT_MS = 4*3600*1000;   // GE buy limits reset 4h after the first purchase
+function boughtRecently(id){        // qty bought within the 4h window + when the window opens again
+  let qty=0, oldest=null;
+  for(const e of (state.alchLog||[])) if(e.id===id && (Date.now()-e.t) < GE_LIMIT_MS){
+    qty+=e.qty; if(oldest==null || e.t<oldest) oldest=e.t;
+  }
+  return { qty, resetAt: oldest!=null ? oldest+GE_LIMIT_MS : null };
+}
+function fmtEta(ms){ const m=Math.max(1,Math.ceil(ms/60000)); return m<60 ? m+"m" : Math.floor(m/60)+"h "+(m%60)+"m"; }
 
 /* ====================== ITEM INDEX (for watchlist lookup + autocomplete) ====================== */
 function indexItems(){
@@ -942,22 +953,30 @@ function buildFlipBasket(rows, capital){
 
 /* ====================== BASKET (buy plan) ====================== */
 function buildBasket(rows, budget){
-  // candidates: profitable, pass volume filter, sorted by profit/alch desc (best gp/hr first)
-  const cand = rows.filter(r=>r.profit>0 && r.vol>=state.minVol)
+  // candidates: profitable, liquid, and sure-fillable (a ⚡ Offer price exists), best profit/alch first
+  const cand = rows.filter(r=>r.profit>0 && r.vol>=state.minVol && r.fastOffer)
                    .sort((a,b)=>b.profit-a.profit);
   let remaining = budget>0 ? budget : Infinity;
+  const dust = Math.max(2500, budget>0 ? Math.round(budget*0.0005) : 0);   // no small fish
   const items=[];
   for(const r of cand){
+    const bought = boughtRecently(r.id);
+    const limLeft = (r.limit||Infinity) - bought.qty;      // 4h GE limit minus what you've marked bought
+    if(limLeft<=0) continue;                                // counter running — can't buy more yet
     const cap = liqCap(r);
     if(cap<=0) continue;
-    const affordable = remaining===Infinity ? cap : Math.floor(remaining/r.buy);
-    const units = Math.min(cap, affordable);
+    const buyAt = r.fastOffer;                              // the price you actually type in (GE escrows this)
+    const affordable = remaining===Infinity ? cap : Math.floor(remaining/buyAt);
+    const units = Math.min(cap, affordable, 125, limLeft);  // nobody got time for >125 of one thing
     if(units<=0) continue;
-    items.push({r, units, cost:units*r.buy, profit:units*r.profit});
-    if(remaining!==Infinity) remaining -= units*r.buy;
+    const profit = units*r.profit;                          // expected total, runes already deducted
+    if(profit < dust) continue;                             // skip the small fish
+    items.push({r, units, buyAt, cost:units*buyAt, profit, bought});
+    if(remaining!==Infinity) remaining -= units*buyAt;
   }
+  items.sort((a,b)=>b.profit-a.profit);                     // always highest total profit first
   const tot = items.reduce((a,i)=>({cost:a.cost+i.cost, profit:a.profit+i.profit, units:a.units+i.units}),{cost:0,profit:0,units:0});
-  return {items, tot, budget};
+  return {items, tot, budget, dust};
 }
 
 /* ====================== RENDER ====================== */
@@ -1020,56 +1039,84 @@ function renderCards(view, budget){
   $("cards").innerHTML = cardsHTML(cards);
 }
 
+function alchLogHTML(){
+  const log = state.alchLog||[];
+  if(!log.length) return `<div class="miniprice" style="margin-top:8px">📒 <b>Alch log:</b> when a buy fills, hit <b>✔ Bought</b> on its row — I'll start its 4-hour limit timer, keep it out of the plan until it resets, and total your winnings here.</div>`;
+  const total = log.reduce((a,e)=>a+e.total,0), bought = log.reduce((a,e)=>a+e.qty,0);
+  const per = {};
+  for(const e of log) per[e.name] = (per[e.name]||0) + e.total;
+  const winners = Object.entries(per).sort((a,b)=>b[1]-a[1]).slice(0,5)
+    .map(([n,p])=>`<span class="rchip">🏆 ${esc(n)} +${fmtShort(p)}</span>`).join(" ");
+  return `<div class="legend" style="margin-top:10px">
+      <span>📒 <b>Alch log</b> — ${fmt(bought)} items bought · profit banked: <b class="pos">+${fmt(total)} gp</b></span>
+      <span>${winners}</span>
+      <span><a id="clearAlchLog" style="cursor:pointer;color:var(--dim)" title="wipe the log and all timers">clear log</a></span>
+    </div>`;
+}
+
 function renderBasket(b, budget){
   const el=$("basket");
   if(budget<=0){
-    el.innerHTML = `<div class="basket-empty">💡 Enter how much gold you have above, and a complete buy plan will appear here —
-      exactly which items to buy, how many, and your total profit.</div>`;
-    $("basketNote").textContent = "Buys the best items in order of profit, within your gold & the 4-hour GE limits.";
+    el.innerHTML = `<div class="basket-empty">💡 Enter how much gold you have above — you'll get the exact list: the ⚡ price to offer, how many, what you'll spend, and your total profit after runes.</div>${alchLogHTML()}`;
+    $("basketNote").textContent = "Best sure-fill alchs for your gold, sorted by total profit. 4h limits tracked via ✔ Bought.";
+    bindAlchLog(el);
     return;
   }
   if(!b.items.length){
-    el.innerHTML = `<div class="basket-empty">No profitable, liquid items fit this budget &amp; filters. Try lowering "Min 24h volume", or switch to "Patient offer" pricing.</div>`;
+    el.innerHTML = `<div class="basket-empty">Nothing worthwhile fits right now — items may be on their 4-hour limit timers, or the filters are strict. Try a lower "Min 24h volume", or check back after the next refresh.</div>${alchLogHTML()}`;
+    bindAlchLog(el);
     return;
   }
   const casts=b.tot.units;
   const hours=casts/ALCH_PER_HOUR;
   const natNeeded=casts, fireNeeded=state.staff?0:casts*FIRE_PER_CAST;
   const leftover=budget-b.tot.cost;
-  const rows=b.items.map(i=>`
-    <tr>
-      <td><div class="it"><img loading="lazy" src="${ICON(i.r.id)}" onerror="this.style.visibility='hidden'"><span class="nm">${esc(i.r.name)}</span></div></td>
+  const rows=b.items.map(i=>{
+    const lim = i.bought.qty>0 ? `<div><span class="holdtag" title="you marked ${fmt(i.bought.qty)} bought — GE limit resets then">🕑 ${fmt(i.bought.qty)} bought · resets in ${fmtEta(i.bought.resetAt-Date.now())}</span></div>` : "";
+    return `<tr>
+      <td><div class="it"><img loading="lazy" src="${ICON(i.r.id)}" onerror="this.style.visibility='hidden'"><div><span class="nm">${esc(i.r.name)}</span>${lim}</div></div></td>
+      <td class="num"><b style="color:var(--gold)">${fmt(i.buyAt)}</b></td>
       <td class="num">${fmt(i.units)}</td>
-      <td class="num">${fmt(i.r.buy)}</td>
-      <td class="num">${i.r.fastOffer?`<b style="color:var(--gold)">${fmt(i.r.fastOffer)}</b>`:`<span style="color:var(--dim)">–</span>`}</td>
-      <td class="num pos">+${fmt(i.r.profit)}</td>
       <td class="num">${fmt(i.cost)}</td>
       <td class="num pos">+${fmt(i.profit)}</td>
-    </tr>`).join("");
+      <td><button class="trackBtn boughtBtn" data-aid="${i.r.id}" data-aname="${esc(i.r.name)}" data-aqty="${i.units}" data-apaid="${i.buyAt}" data-apea="${i.r.profit}" title="Mark bought: starts the 4h limit timer + banks the profit in your log">✔ Bought</button></td>
+    </tr>`;
+  }).join("");
   el.innerHTML = `
     <table class="basket">
-      <thead><tr><th>Item</th><th>Buy qty</th><th>Market @</th><th>⚡ Offer @</th><th>Profit/ea</th><th>Spend</th><th>Profit</th></tr></thead>
+      <thead><tr><th>Item</th><th>⚡ Buy @</th><th>Qty</th><th>Spend</th><th>Total profit</th><th>Filled?</th></tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr>
         <td>TOTAL — ${b.items.length} items</td>
+        <td></td>
         <td class="num">${fmt(b.tot.units)}</td>
-        <td></td><td></td><td></td>
         <td class="num">${fmt(b.tot.cost)}</td>
         <td class="num">+${fmt(b.tot.profit)}</td>
+        <td></td>
       </tr></tfoot>
     </table>
     <div class="legend" style="margin-top:12px">
-      <span>🌿 Nature runes needed: <b>${fmt(natNeeded)}</b> (≈ ${fmtShort(natNeeded*num(state.natPrice,130))} gp)</span>
+      <span>🌿 Nature runes: <b>${fmt(natNeeded)}</b> (≈ ${fmtShort(natNeeded*num(state.natPrice,130))} gp)</span>
       ${fireNeeded?`<span>🔥 Fire runes: <b>${fmt(fireNeeded)}</b></span>`:`<span>🔥 Fire runes: <b>0</b> (Staff of Fire)</span>`}
       <span>⏱️ Alch time: <b>~${hours<1?Math.round(hours*60)+" min":hours.toFixed(1)+" hrs"}</b> (${fmt(casts)} casts)</span>
       <span>✨ Magic XP: <b>${fmtShort(casts*XP_PER_CAST)}</b></span>
-      <span>💵 Gold left over: <b>${fmt(leftover)} gp</b></span>
+      <span>💵 Left over: <b>${fmt(leftover)} gp</b></span>
     </div>
     <div class="miniprice" style="margin-top:8px;font-size:12px">
-      ⚡ <b>Place your buy offers at the "⚡ Offer @" price, not the market price.</b> It looks like overpaying — it isn't: the GE fills you at the seller's (lower) price and refunds the difference, so it fills near-instantly and <b>every fill still profits ≥${fmt(Math.max(1,num(state.alchLock,150)))} gp/alch</b>. The "Market @" price can be minutes stale, which is why offers at it sometimes sit unfilled.<br>
-      💡 After alching this batch you'll have <b>~${fmtShort(budget+b.tot.profit)} gp</b> (your gold back + profit). GE buy limits reset every 4 hours — repeat the plan to keep earning.
-    </div>`;
-  $("basketNote").textContent = `Best ${b.items.length} items for your ${fmtShort(budget)} gp · +${fmtShort(b.tot.profit)} gp profit this cycle`;
+      ⚡ Offer exactly the <b>⚡ Buy @</b> price — it fills near-instantly, you usually pay <i>less</i> (the GE refunds down to the real asking price), and even the worst case profits ≥${fmt(Math.max(1,num(state.alchLock,150)))}/alch. "Spend" is the up-front coin the GE holds for the offers. Small fish (&lt;${fmtShort(b.dust)} total) and anything over <b>125 qty</b> are filtered out; items on a ⏳ limit timer come back automatically when it resets.
+    </div>
+    ${alchLogHTML()}`;
+  bindAlchLog(el);
+  $("basketNote").textContent = `${b.items.length} items for ${fmtShort(budget)} gp · +${fmtShort(b.tot.profit)} gp this cycle · sorted by total profit`;
+}
+function bindAlchLog(el){
+  el.querySelectorAll(".boughtBtn").forEach(btn=>btn.onclick=()=>{
+    const qty=+btn.dataset.aqty, pea=+btn.dataset.apea;
+    state.alchLog.push({ id:+btn.dataset.aid, name:btn.dataset.aname, qty, paid:+btn.dataset.apaid, profitEa:pea, total:qty*pea, t:Date.now() });
+    saveState(); render();
+  });
+  const cl=el.querySelector("#clearAlchLog");
+  if(cl) cl.onclick=()=>{ state.alchLog=[]; saveState(); render(); };
 }
 
 const COLS=[
@@ -1096,8 +1143,10 @@ function renderTable(view, budget){
   const html = view.slice(0,400).map(r=>{
     const staleM = r.stale ? `<span class="stale" title="price is stale">⚠</span>` : "";
     const best = (r===view[0]) ? "best" : "";
+    const bi = boughtRecently(r.id);
+    const limTag = bi.qty>0 ? `<span class="holdtag" title="you marked ${fmt(bi.qty)} bought — GE 4h limit">🕑 ${fmt(Math.max(0,(r.limit||0)-bi.qty))} left · ${fmtEta(bi.resetAt-Date.now())}</span>` : "";
     return `<tr class="${best}">
-      <td><div class="it"><img loading="lazy" src="${ICON(r.id)}" onerror="this.style.visibility='hidden'"><span class="nm">${esc(r.name)}</span></div></td>
+      <td><div class="it"><img loading="lazy" src="${ICON(r.id)}" onerror="this.style.visibility='hidden'"><span class="nm">${esc(r.name)}${limTag}</span></div></td>
       <td class="num">${fmt(r.buy)} ${staleM}<span class="stale" style="color:var(--dim)"> ${ageStr(r.btime)}</span></td>
       <td class="num">${fmt(r.alch)}</td>
       <td class="num ${colClass(r.profit)}">${r.profit>0?"+":""}${fmt(r.profit)}</td>
@@ -1458,6 +1507,7 @@ function loadState(){
     if(s) Object.assign(state, s);
   }catch(e){}
   if(!Array.isArray(state.watch)) state.watch=[];
+  if(!Array.isArray(state.alchLog)) state.alchLog=[];
   if(!new Set(["evScore","gradeRank","roundTripHrs","youProfit","roi","net","buy"]).has(state.flipSort)) state.flipSort="evScore";
   if(!["safe","balanced","all"].includes(state.flipMode)) state.flipMode="safe";
   $("gold").value = state.gold||"";
